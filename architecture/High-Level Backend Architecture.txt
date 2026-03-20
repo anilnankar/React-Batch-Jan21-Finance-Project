@@ -1,0 +1,18 @@
+[ Client (Next.js) ]
+          │
+          ▼
+   [ API Gateway ]
+          │
+ ┌────────┼────────┐
+ ▼        ▼        ▼
+Auth   Account   Transaction
+Svc     Svc        Svc
+ │        │          │
+ ▼        ▼          ▼
+User DB  Account DB  Ledger DB
+             │
+             ▼
+         Loan Service
+             │
+             ▼
+         MySQL Cluster

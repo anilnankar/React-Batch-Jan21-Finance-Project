@@ -1,0 +1,22 @@
+User Browser
+     │
+     ▼
+ Next.js App
+     │
+ ┌───────────────┐
+ │ UI Layer      │
+ │ (Pages/Views) │
+ └───────────────┘
+     │
+ ┌───────────────┐
+ │ State Layer   │
+ │ (Redux/Zustand) │
+ └───────────────┘
+     │
+ ┌───────────────┐
+ │ Service Layer │
+ │ (API Calls)   │
+ └───────────────┘
+     │
+     ▼
+ Backend APIs (Node.js)
