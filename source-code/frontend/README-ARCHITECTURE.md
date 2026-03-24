@@ -79,6 +79,7 @@ source-code/frontend
 - Keep app routing in `src/app` and avoid business logic in route files.
 - Prefer typed API contracts and centralized API client wrappers.
 - Never store sensitive finance data in browser local storage.
+- Keep client branding and theme values centralized in `src/config/client-config.ts`.
 
 ## Domain notes
 
@@ -90,7 +91,17 @@ source-code/frontend
 
 ## Next steps
 
-- Add Next.js bootstrap files (`package.json`, `tsconfig.json`, `next.config.*`, ESLint config).
+- Bootstrap is in place: `package.json`, `tsconfig.json`, `next.config.ts`, `eslint.config.mjs`, `.gitignore`, `next-env.d.ts`. Run `npm install` then `npm run dev` from `source-code/frontend`.
 - Add shared design tokens and theme strategy in `src/styles`.
 - Add validation schemas and API boundaries per feature.
 - Add unit/integration/e2e pipelines and coverage thresholds.
+
+## Theme configuration
+
+`src/config/client-config.ts` contains a strongly typed `clientUiConfig` object where each client can configure:
+
+- color palette
+- border radius and spacing tokens
+- home page labels and support contact data
+
+Use this config as the first source of UI customization before hardcoding style values in components.
