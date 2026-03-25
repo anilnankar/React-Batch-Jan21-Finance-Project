@@ -33,9 +33,8 @@ export default function HomeScreen() {
         supportTitle={home.supportTitle}
         supportPhone={home.supportPhone}
         searchPlaceholder={home.searchPlaceholder}
-        heroTitle={home.heroTitle}
         heroSlides={home.heroSlides}
-        promoTitle={home.promoTitle}
+        promoSlides={home.promoSlides}
       />
     </main>
   );

@@ -10,9 +10,8 @@ type HomeBootstrapLayoutProps = {
   supportTitle: string;
   supportPhone: string;
   searchPlaceholder?: string;
-  heroTitle: string;
   heroSlides: string[];
-  promoTitle: string;
+  promoSlides: string[];
 };
 
 export default function HomeBootstrapLayout({
@@ -23,7 +22,7 @@ export default function HomeBootstrapLayout({
   supportPhone,
   searchPlaceholder,
   heroSlides,
-  promoTitle,
+  promoSlides,
 }: HomeBootstrapLayoutProps) {
   const firstRow = actionCards.slice(0, 3);
   const secondRow = actionCards.slice(3, 5);
@@ -36,7 +35,7 @@ export default function HomeBootstrapLayout({
         <div className="col-12 col-lg-7">
           <div className="d-grid gap-3">
             <UiCard radius="sm" style={{ minHeight: 62, padding: 0 }}>
-              <div className="d-grid align-items-center px-3" style={{ minHeight: 62 }}>
+              <div className="px-3 d-grid align-items-center" style={{ minHeight: 62 }}>
                 {searchPlaceholder ? <span>{searchPlaceholder}</span> : null}
               </div>
             </UiCard>
@@ -86,15 +85,8 @@ export default function HomeBootstrapLayout({
         </div>
 
         <div className="col-12 col-lg-5">
-          <UiCard radius="lg" style={{ minHeight: 620, padding: 0 }} className="text-center">
-            <div
-              className="d-grid align-items-center justify-content-center"
-              style={{ minHeight: 620 }}
-            >
-              <h2 className="m-0" style={{ fontSize: "clamp(40px, 6vw, 92px)", letterSpacing: 2 }}>
-                {promoTitle}
-              </h2>
-            </div>
+          <UiCard radius="lg" style={{ minHeight: 620, padding: 0 }} className="p-0">
+            <HeroCarousel id="promo-carousel" slides={promoSlides} heightPx={620} />
           </UiCard>
         </div>
       </div>
