@@ -1,6 +1,7 @@
-import type { ReactNode } from "react";
+﻿import type { ReactNode } from "react";
 import type { Metadata } from "next";
 import "./globals.css";
+import BootstrapClient from "@/components/client/BootstrapClient";
 
 export const metadata: Metadata = {
   title: "Finance Project",
@@ -14,7 +15,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <BootstrapClient />
+        {children}
+      </body>
     </html>
   );
 }
+

@@ -1,15 +1,18 @@
-import type { CSSProperties } from "react";
+﻿import type { CSSProperties } from "react";
 import { clientUiConfig } from "@/config/client-config";
-import TopHeader from "@/components/molecules/TopHeader";
+import HomeBootstrapLayout from "./HomeBootstrapLayout";
 
 export default function HomeScreen() {
   const { theme, home } = clientUiConfig;
 
   return (
     <main
-      className="home-page"
+      className="min-vh-100 p-2"
       style={
         {
+          backgroundColor: theme.colors.pageBackground,
+          color: theme.colors.primaryText,
+
           "--page-bg": theme.colors.pageBackground,
           "--panel-bg": theme.colors.panelBackground,
           "--border-color": theme.colors.border,
@@ -23,33 +26,17 @@ export default function HomeScreen() {
         } as CSSProperties
       }
     >
-      <TopHeader logoText={home.logoText} links={home.topLinks} />
-
-      <section className="home-content">
-        <section className="left-column">
-          <div className="search-strip">{home.searchPlaceholder}</div>
-
-          <div className="action-grid">
-            {home.actionCards.map((item) => (
-              <button key={item} type="button" className="action-card">
-                {item}
-              </button>
-            ))}
-            <div className="support-card">
-              <p>{home.supportTitle}</p>
-              <strong>{home.supportPhone}</strong>
-            </div>
-          </div>
-
-          <section className="hero-slider" aria-label="Hero">
-            <h2>{home.heroTitle}</h2>
-          </section>
-        </section>
-
-        <section className="right-column" aria-label="Promotions">
-          <h2>{home.promoTitle}</h2>
-        </section>
-      </section>
+      <HomeBootstrapLayout
+        logoText={home.logoText}
+        topLinks={home.topLinks}
+        actionCards={home.actionCards}
+        supportTitle={home.supportTitle}
+        supportPhone={home.supportPhone}
+        searchPlaceholder={home.searchPlaceholder}
+        heroTitle={home.heroTitle}
+        heroSlides={home.heroSlides}
+        promoTitle={home.promoTitle}
+      />
     </main>
   );
 }

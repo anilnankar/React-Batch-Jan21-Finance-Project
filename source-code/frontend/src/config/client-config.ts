@@ -1,4 +1,4 @@
-export type ClientTheme = {
+﻿export type ClientTheme = {
   colors: {
     pageBackground: string;
     panelBackground: string;
@@ -25,6 +25,7 @@ export type HomeScreenConfig = {
   supportPhone: string;
   searchPlaceholder: string;
   heroTitle: string;
+  heroSlides: string[];
   promoTitle: string;
 };
 
@@ -60,6 +61,7 @@ export const clientUiConfig: ClientUiConfig = {
     supportPhone: "88888 77777",
     searchPlaceholder: "",
     heroTitle: "SLIDER",
+    heroSlides: ["SLIDER", "SLIDER", "SLIDER"],
     promoTitle: "SLIDER",
   },
 };
