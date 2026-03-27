@@ -1,92 +1,97 @@
-# Backend Setup (Node.js + Express)
+# Finance Backend (Node.js + Express)
 
-This backend project is created inside `source-code/backend`.
+Secure, modular backend scaffold for a finance system.  
+Path: `source-code/backend`
 
-## 1) Create project folder
-
-Backend folder path:
-
-`source-code/backend`
-
-## 2) Initialize Node project
-
-```bash
-npm init -y
-```
-
-This creates `package.json`.
-
-## 3) Install dependencies
-
-Runtime dependencies:
-
-```bash
-npm install express cors dotenv
-```
-
-Dev dependency:
-
-```bash
-npm install -D nodemon
-```
-
-## 4) Configure scripts
-
-Added scripts in `package.json`:
-
-- `npm run dev` -> starts with nodemon for development
-- `npm start` -> starts with node for production/basic run
-
-## 5) Create project structure
+## Project Structure (Industry Style)
 
 ```text
 backend/
   src/
+    config/                 # environment + app configuration
+    middlewares/            # central error and not-found handlers
+    modules/                # business modules by feature
+      health/
+        health.controller.js
+        health.routes.js
     routes/
-      health.routes.js
-    app.js
-    server.js
+      v1/
+        index.js            # API v1 route registry
+    utils/                  # shared helpers (errors, async handler)
+    app.js                  # express app, middleware, route mounting
+    server.js               # server bootstrap
   .env.example
   .gitignore
   package.json
 ```
 
-## 6) Environment variables
+## Security and Clean Code Measures Added
 
-Copy `.env.example` to `.env` and update values as needed:
+- `helmet` for secure HTTP headers
+- `cors` configured through env (`CORS_ORIGIN`)
+- `hpp` to prevent HTTP parameter pollution
+- request body size limits (`10kb`) to reduce abuse vectors
+- centralized rate limiting via `express-rate-limit`
+- environment variable schema validation using `zod`
+- global 404 and error handlers
+- API versioning pattern with `/api/v1`
+- module-first folder design (`modules/<feature>`)
+
+## Step-by-Step Setup Notes
+
+## 1) Initialize backend
+
+```bash
+cd source-code/backend
+npm init -y
+```
+
+## 2) Install dependencies
+
+```bash
+npm install express cors dotenv helmet express-rate-limit hpp morgan zod
+npm install -D nodemon cross-env
+```
+
+## 3) Configure scripts
+
+- `npm run dev` -> development with auto-reload
+- `npm start` -> standard start
+- `npm run start:prod` -> production mode (cross-platform env setting)
+
+## 4) Configure environment
+
+Create `.env` from `.env.example`:
 
 ```env
 PORT=5000
 NODE_ENV=development
+CORS_ORIGIN=*
+API_RATE_LIMIT_WINDOW_MS=900000
+API_RATE_LIMIT_MAX=200
 ```
 
-## 7) Run the backend
-
-Development mode:
+## 5) Run server
 
 ```bash
 npm run dev
 ```
 
-Production/basic mode:
+## 6) Verify endpoints
 
-```bash
-npm start
-```
-
-## 8) Test API endpoints
-
-- `GET /` -> Welcome message
-- `GET /api/health` -> Health status JSON
+- `GET /` -> API welcome payload
+- `GET /api/v1/health` -> health response
 
 Examples:
 
 - [http://localhost:5000/](http://localhost:5000/)
-- [http://localhost:5000/api/health](http://localhost:5000/api/health)
+- [http://localhost:5000/api/v1/health](http://localhost:5000/api/v1/health)
 
-## Notes
+## Recommended Next Steps for Finance System
 
-- `app.js` contains middleware and routes.
-- `server.js` handles app startup and port configuration.
-- `health.routes.js` is a simple feature route and starter pattern for future modules.
-- Keep secrets only in `.env` (already ignored in git).
+- Add authentication module (JWT + refresh token rotation)
+- Add role-based authorization (`admin`, `accountant`, `user`)
+- Add request validation middleware per route (zod schemas)
+- Add transaction/audit log module for financial actions
+- Add database layer (`prisma` + PostgreSQL) and migration strategy
+- Add test setup (`jest` + `supertest`) and CI checks
