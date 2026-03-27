@@ -1,4 +1,4 @@
-﻿import UiButton from "@/components/atoms/ui/UiButton";
+import UiButton from "@/components/atoms/ui/UiButton";
 import UiCard from "@/components/atoms/ui/UiCard";
 import TopHeader from "@/components/molecules/TopHeader";
 import HeroCarousel from "./HeroCarousel";
@@ -24,8 +24,11 @@ export default function HomeBootstrapLayout({
   heroSlides,
   promoSlides,
 }: HomeBootstrapLayoutProps) {
-  const firstRow = actionCards.slice(0, 3);
-  const secondRow = actionCards.slice(3, 5);
+  const chunkSize = 3;
+  const actionCardRows: string[][] = [];
+  for (let i = 0; i < actionCards.length; i += chunkSize) {
+    actionCardRows.push(actionCards.slice(i, i + chunkSize));
+  }
 
   return (
     <div className="container-fluid px-0">
@@ -41,27 +44,17 @@ export default function HomeBootstrapLayout({
             </UiCard>
 
             <div className="d-grid gap-2">
-              <div className="row row-cols-3 g-2">
-                {firstRow.map((label) => (
-                  <div key={label} className="col">
-                    <UiButton>{label}</UiButton>
-                  </div>
-                ))}
-              </div>
+              {actionCardRows.map((row, rowIndex) => (
+                <div key={`row-${rowIndex}`} className="row row-cols-3 g-2">
+                  {row.map((label) => (
+                    <div key={label} className="col">
+                      <UiButton>{label}</UiButton>
+                    </div>
+                  ))}
+                </div>
+              ))}
 
-              <div className="row row-cols-3 g-2">
-                {secondRow[0] ? (
-                  <div className="col">
-                    <UiButton>{secondRow[0]}</UiButton>
-                  </div>
-                ) : null}
-
-                {secondRow[1] ? (
-                  <div className="col">
-                    <UiButton>{secondRow[1]}</UiButton>
-                  </div>
-                ) : null}
-
+              <div className="row row-cols-3 g-2" style={{display: 'none'}}>
                 <div className="col">
                   <UiCard radius="md" style={{ minHeight: 92, padding: 0 }} className="text-center">
                     <div

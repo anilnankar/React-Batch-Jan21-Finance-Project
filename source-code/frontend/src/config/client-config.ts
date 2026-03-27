@@ -19,7 +19,10 @@ export type ClientTheme = {
 
 export type HomeScreenConfig = {
   logoText: string;
-  topLinks: string[];
+  topLinks: {
+    label: string;
+    href: string;
+  }[];
   actionCards: string[];
   supportTitle: string;
   supportPhone: string;
@@ -55,15 +58,21 @@ export const clientUiConfig: ClientUiConfig = {
     },
   },
   home: {
-    logoText: "Logo",
-    topLinks: ["Help", "About", "Login"],
-    actionCards: ["Accounts", "Cards", "Loans", "Investments", "Deposits"],
+    logoText: "Finance System ",
+    topLinks: [
+      { label: "Home", href: "/" },
+      { label: "Login", href: "/login" },
+      { label: "Help", href: "/help" },
+      { label: "About", href: "/about" },
+    ],
+    actionCards: ["Accounts", "Cards", "Loans", 
+      "Investments", "Deposits", "Customer Care"],
     supportTitle: "Contact Support",
     supportPhone: "88888 77777",
     searchPlaceholder: "",
     heroTitle: "SLIDER",
-    heroSlides: ["SLIDER", "SLIDER", "SLIDER"],
-    promoSlides: ["SLIDER", "SLIDER", "SLIDER"],
+    heroSlides: ["SLIDER 1", "SLIDER 2", "SLIDER 3"],
+    promoSlides: ["SLIDER 10", "SLIDER 11", "SLIDER 12"],
     promoTitle: "SLIDER",
   },
 };

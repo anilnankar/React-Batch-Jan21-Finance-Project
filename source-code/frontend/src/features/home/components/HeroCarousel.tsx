@@ -36,7 +36,7 @@ export default function HeroCarousel({ id, slides, heightPx }: HeroCarouselProps
         carouselInstance = new b.Carousel(el, {
           interval: 3500,
           wrap: true,
-          ride: false,
+          ride: true,
         });
       }
 
@@ -104,3 +104,4 @@ export default function HeroCarousel({ id, slides, heightPx }: HeroCarouselProps
     </div>
   );
 }
+

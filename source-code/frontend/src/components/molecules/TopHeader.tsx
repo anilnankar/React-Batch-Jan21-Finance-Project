@@ -1,19 +1,21 @@
-﻿import React from "react";
+import React from "react";
 import LogoBadge from "../atoms/LogoBadge";
 import NavLinkItem from "../atoms/NavLinkItem";
 
 type TopHeaderProps = {
   logoText: string;
-  links: string[];
+  links: {
+    label: string;
+    href: string;
+  }[];
 };
 
 export default function TopHeader({ logoText, links }: TopHeaderProps) {
   const activeIndex = 0;
-
   return (
     <header>
       <nav
-        className="navbar navbar-expand-lg bg-light"
+        className="navbar navbar-expand-lg"
         style={{
           backgroundColor: "var(--panel-bg)",
           border: "2px solid var(--border-color)",
@@ -43,10 +45,10 @@ export default function TopHeader({ logoText, links }: TopHeaderProps) {
           </button>
 
           <div className="collapse navbar-collapse" id="topNavbar">
-            <ul className="navbar-nav ms-auto mb-2 mb-lg-0">
-              {links.map((label, idx) => (
-                <li key={label} className="nav-item">
-                  <NavLinkItem label={label} isActive={idx === activeIndex} />
+            <ul className="navbar-nav ms-auto mb-2 mb-lg-0 gap-3 gap-lg-4">
+              {links.map((link, idx) => (
+                <li key={link.label} className="nav-item">
+                  <NavLinkItem label={link.label} href={link.href} isActive={idx === activeIndex} />
                 </li>
               ))}
             </ul>

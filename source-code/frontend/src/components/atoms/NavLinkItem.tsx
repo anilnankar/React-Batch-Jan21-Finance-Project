@@ -1,14 +1,15 @@
-﻿import React from "react";
+import React from "react";
+import Link from "next/link";
 
 type NavLinkItemProps = {
   label: string;
-  href?: string;
+  href: string;
   isActive?: boolean;
 };
 
-export default function NavLinkItem({ label, href = "#", isActive }: NavLinkItemProps) {
+export default function NavLinkItem({ label, href, isActive }: NavLinkItemProps) {
   return (
-    <a
+    <Link
       href={href}
       className={`nav-link fw-bold${isActive ? " active" : ""}`}
       aria-current={isActive ? "page" : undefined}
@@ -20,7 +21,7 @@ export default function NavLinkItem({ label, href = "#", isActive }: NavLinkItem
       }}
     >
       {label}
-    </a>
+    </Link>
   );
 }
 
