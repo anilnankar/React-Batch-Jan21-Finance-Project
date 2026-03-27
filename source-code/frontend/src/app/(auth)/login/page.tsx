@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function LoginPage() {
   return (
     <main className="container py-5">
@@ -23,6 +25,9 @@ export default function LoginPage() {
                   Sign in
                 </button>
               </form>
+              <p className="text-center mt-3 mb-0">
+                New customer? <Link href="/register">Create account</Link>
+              </p>
             </div>
           </div>
         </div>
