@@ -69,6 +69,12 @@ NODE_ENV=development
 CORS_ORIGIN=*
 API_RATE_LIMIT_WINDOW_MS=900000
 API_RATE_LIMIT_MAX=200
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=root
+DB_PASSWORD=your_password
+DB_NAME=finance_db
+DB_POOL_LIMIT=10
 ```
 
 ## 5) Run server
@@ -80,7 +86,7 @@ npm run dev
 ## 6) Verify endpoints
 
 - `GET /` -> API welcome payload
-- `GET /api/v1/health` -> health response
+- `GET /api/v1/health` -> health response with DB status
 
 Examples:
 
