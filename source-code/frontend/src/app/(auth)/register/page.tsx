@@ -6,14 +6,57 @@ import Link from "next/link";
 export default function RegisterPage() {
   const [validated, setValidated] = useState(false);
   const [emailError, setEmailError] = useState("Enter valid email id");
+  const [submitMessage, setSubmitMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
     const form = event.currentTarget;
+
     if (!form.checkValidity()) {
-      event.preventDefault();
       event.stopPropagation();
+      setValidated(true);
+      return;
     }
     setValidated(true);
+    setSubmitMessage("");
+
+    const formData = new FormData(form);
+    const payload = {
+      customer_type: String(formData.get("customerType") || ""),
+      full_name: String(formData.get("fullName") || ""),
+      date_of_birth_or_incorp: String(formData.get("dobOrIncorp") || "") || null,
+      mobile_number: String(formData.get("mobileNumber") || ""),
+      email: String(formData.get("email") || "") || null,
+      pan_number: String(formData.get("panNumber") || ""),
+    };
+    console.log(payload);
+
+    try {
+      setIsSubmitting(true);
+      const response = await fetch("http://localhost:5000/api/v1/customer", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        setSubmitMessage(result?.message || "Failed to register customer");
+        return;
+      }
+
+      setSubmitMessage("Customer registered successfully");
+      form.reset();
+      setValidated(false);
+    } catch {
+      setSubmitMessage("Unable to connect to backend API");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleEmailInvalid = (event: InvalidEvent<HTMLInputElement>) => {
@@ -58,7 +101,7 @@ export default function RegisterPage() {
                   <label className="form-label" htmlFor="customerType">
                     Customer Type <span className="text-danger">*</span>
                   </label>
-                  <select id="customerType" className="form-select" defaultValue="" required>
+                  <select id="customerType" name="customerType" className="form-select" defaultValue="" required>
                     <option value="" disabled>
                       Select customer type
                     </option>
@@ -74,6 +117,7 @@ export default function RegisterPage() {
                   </label>
                   <input
                     id="fullName"
+                    name="fullName"
                     type="text"
                     className="form-control"
                     placeholder="Enter full name"
@@ -88,7 +132,7 @@ export default function RegisterPage() {
                   <label className="form-label" htmlFor="dobOrIncorp">
                     Date of Birth / Incorporation
                   </label>
-                  <input id="dobOrIncorp" type="date" className="form-control" />
+                  <input id="dobOrIncorp" name="dobOrIncorp" type="date" className="form-control" />
                 </div>
 
                 <div className="col-12 col-md-6">
@@ -97,6 +141,7 @@ export default function RegisterPage() {
                   </label>
                   <input
                     id="mobileNumber"
+                    name="mobileNumber"
                     type="tel"
                     className="form-control"
                     placeholder="10-15 digit mobile number"
@@ -113,6 +158,7 @@ export default function RegisterPage() {
                   </label>
                   <input
                     id="email"
+                    name="email"
                     type="email"
                     className="form-control"
                     placeholder="name@example.com"
@@ -131,6 +177,7 @@ export default function RegisterPage() {
                   </label>
                   <input
                     id="panNumber"
+                    name="panNumber"
                     type="text"
                     className="form-control text-uppercase"
                     placeholder="ABCDE1234F"
@@ -149,14 +196,21 @@ export default function RegisterPage() {
                     Customer code, KYC status, risk category, and account status are managed by the system.
                   </small>
                 </div>
+                {submitMessage ? (
+                  <div className="col-12">
+                    <div className="alert alert-info py-2 mb-0" role="alert">
+                      {submitMessage}
+                    </div>
+                  </div>
+                ) : null}
 
 
                 <div className="col-12 d-grid d-md-flex gap-2 justify-content-md-end">
                   <Link href="/login" className="btn btn-outline-secondary">
                     Back to Login
                   </Link>
-                  <button type="submit" className="btn btn-primary">
-                    Register Customer
+                  <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+                    {isSubmitting ? "Registering..." : "Register Customer"}
                   </button>
                 </div>
               </form>
