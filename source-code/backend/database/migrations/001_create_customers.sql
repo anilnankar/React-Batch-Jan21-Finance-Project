@@ -1,0 +1,21 @@
+CREATE TABLE customers (
+  customer_id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  customer_code          VARCHAR(32) NOT NULL,
+  customer_type          ENUM('INDIVIDUAL','BUSINESS') NOT NULL,
+  full_name              VARCHAR(150) NOT NULL,
+  date_of_birth_or_incorp DATE NULL,
+  mobile_number          VARCHAR(15) NOT NULL,
+  email                  VARCHAR(150) NULL,
+  pan_number             VARCHAR(10) NOT NULL,
+  kyc_status             ENUM('PENDING','VERIFIED','REJECTED','EXPIRED') NOT NULL DEFAULT 'PENDING',
+  risk_category          ENUM('LOW','MEDIUM','HIGH') NOT NULL DEFAULT 'LOW',
+  status                 ENUM('ACTIVE','SUSPENDED','CLOSED','RESTRICTED') NOT NULL DEFAULT 'ACTIVE',
+  created_at             DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at             DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (customer_id),
+  UNIQUE KEY uq_customers_code (customer_code),
+  UNIQUE KEY uq_customers_pan (pan_number),
+  UNIQUE KEY uq_customers_mobile (mobile_number),
+  KEY idx_customers_status (status),
+  KEY idx_customers_kyc_status (kyc_status)
+) ENGINE=InnoDB;

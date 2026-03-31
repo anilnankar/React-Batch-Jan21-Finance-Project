@@ -1,0 +1,2 @@
+ALTER TABLE customers
+ADD COLUMN password VARCHAR(32) NOT NULL AFTER email;
