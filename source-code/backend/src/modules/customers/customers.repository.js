@@ -1,6 +1,7 @@
 const { pool } = require("../../config/database");
 
-const insertCustomer = async (customerData) => {
+const insertCustomer = async (customerData, connection = null) => {
+  const executor = connection || pool;
   const query = `
     INSERT INTO customers (
       customer_code,
@@ -9,8 +10,9 @@ const insertCustomer = async (customerData) => {
       date_of_birth_or_incorp,
       mobile_number,
       email,
+      password,
       pan_number
-    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, MD5(?), ?)
   `;
 
   const values = [
@@ -20,10 +22,11 @@ const insertCustomer = async (customerData) => {
     customerData.date_of_birth_or_incorp || null,
     customerData.mobile_number,
     customerData.email || null,
+    customerData.password,
     customerData.pan_number,
   ];
 
-  const [result] = await pool.execute(query, values);
+  const [result] = await executor.execute(query, values);
   return result.insertId;
 };
 

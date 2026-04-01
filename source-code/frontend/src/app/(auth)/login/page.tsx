@@ -38,6 +38,11 @@ export default function LoginPage() {
         return;
       }
 
+      const customerId = result?.data?.customer_id;
+      if (customerId != null) {
+        sessionStorage.setItem("customerId", String(customerId));
+      }
+
       setSubmitMessage(result?.message || "Login successful");
       router.push("/dashboard");
     } catch {

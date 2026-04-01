@@ -24,10 +24,12 @@ export default function RegisterPage() {
     const formData = new FormData(form);
     const payload = {
       customer_type: String(formData.get("customerType") || ""),
+      account_type: String(formData.get("accountType") || ""),
       full_name: String(formData.get("fullName") || ""),
       date_of_birth_or_incorp: String(formData.get("dobOrIncorp") || "") || null,
       mobile_number: String(formData.get("mobileNumber") || ""),
       email: String(formData.get("email") || "") || null,
+      password: String(formData.get("password") || ""),
       pan_number: String(formData.get("panNumber") || ""),
     };
     console.log(payload);
@@ -112,6 +114,21 @@ export default function RegisterPage() {
                 </div>
 
                 <div className="col-12 col-md-6">
+                  <label className="form-label" htmlFor="accountType">
+                    Account Type <span className="text-danger">*</span>
+                  </label>
+                  <select id="accountType" name="accountType" className="form-select" defaultValue="" required>
+                    <option value="" disabled>
+                      Select account type
+                    </option>
+                    <option value="SAVINGS">Savings</option>
+                    <option value="CURRENT">Current</option>
+                    <option value="LOAN_LINKED">Loan linked</option>
+                  </select>
+                  <div className="invalid-feedback">Account type is required.</div>
+                </div>
+
+                <div className="col-12 col-md-6">
                   <label className="form-label" htmlFor="fullName">
                     Full Name <span className="text-danger">*</span>
                   </label>
@@ -169,6 +186,24 @@ export default function RegisterPage() {
                   />
                   <div className="invalid-feedback">{emailError}</div>
                   <div className="valid-feedback">Email ID is valid.</div>
+                </div>
+
+                <div className="col-12 col-md-6">
+                  <label className="form-label" htmlFor="password">
+                    Password <span className="text-danger">*</span>
+                  </label>
+                  <input
+                    id="password"
+                    name="password"
+                    type="password"
+                    className="form-control"
+                    placeholder="At least 6 characters"
+                    minLength={6}
+                    maxLength={128}
+                    autoComplete="new-password"
+                    required
+                  />
+                  <div className="invalid-feedback">Password must be at least 6 characters.</div>
                 </div>
 
                 <div className="col-12 col-md-6">

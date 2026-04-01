@@ -3,6 +3,7 @@ const { z } = require("zod");
 const createCustomerSchema = z
   .object({
     customer_type: z.enum(["INDIVIDUAL", "BUSINESS"]),
+    account_type: z.enum(["SAVINGS", "CURRENT", "LOAN_LINKED"]),
     full_name: z.string().trim().min(2).max(150),
     date_of_birth_or_incorp: z
       .string()
@@ -11,6 +12,7 @@ const createCustomerSchema = z
       .nullable(),
     mobile_number: z.string().trim().min(10).max(15),
     email: z.string().trim().email().max(150).optional().nullable(),
+    password: z.string().min(6).max(128),
     pan_number: z
       .string()
       .trim()
