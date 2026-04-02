@@ -11,9 +11,6 @@ backend/
     config/                 # environment + app configuration
     middlewares/            # central error and not-found handlers
     modules/                # business modules by feature
-      health/
-        health.controller.js
-        health.routes.js
     routes/
       v1/
         index.js            # API v1 route registry
@@ -86,12 +83,10 @@ npm run dev
 ## 6) Verify endpoints
 
 - `GET /` -> API welcome payload
-- `GET /api/v1/health` -> health response with DB status
 
-Examples:
+Example:
 
 - [http://localhost:5000/](http://localhost:5000/)
-- [http://localhost:5000/api/v1/health](http://localhost:5000/api/v1/health)
 
 ## Recommended Next Steps for Finance System
 
