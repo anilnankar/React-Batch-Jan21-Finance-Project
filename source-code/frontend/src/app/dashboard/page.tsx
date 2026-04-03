@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 
 type AccountRow = {
   account_id: number;
@@ -13,6 +13,17 @@ type AccountRow = {
   status: string;
   available_balance: string;
   ledger_balance: string;
+};
+
+type BeneficiaryRow = {
+  beneficiary_id: number;
+  account_id: number;
+  beneficiary_name: string;
+  beneficiary_account_number: string;
+  ifsc_code: string | null;
+  bank_name: string | null;
+  nickname: string | null;
+  status: string;
 };
 
 type CustomerRow = {
@@ -93,6 +104,15 @@ export default function DashboardPage() {
   const [customer, setCustomer] = useState<CustomerRow | null>(null);
   const [loadError, setLoadError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [addPayeeModalOpen, setAddPayeeModalOpen] = useState(false);
+  const [payeeSubmitMessage, setPayeeSubmitMessage] = useState("");
+  const [isSubmittingPayee, setIsSubmittingPayee] = useState(false);
+  const [makePaymentModalOpen, setMakePaymentModalOpen] = useState(false);
+  const [paymentFromAccountId, setPaymentFromAccountId] = useState("");
+  const [paymentBeneficiaries, setPaymentBeneficiaries] = useState<BeneficiaryRow[]>([]);
+  const [loadingPaymentBeneficiaries, setLoadingPaymentBeneficiaries] = useState(false);
+  const [paymentSubmitMessage, setPaymentSubmitMessage] = useState("");
+  const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
 
   useEffect(() => {
     const customerId = sessionStorage.getItem("customerId");
@@ -157,9 +177,215 @@ export default function DashboardPage() {
     };
   }, [router]);
 
+  useEffect(() => {
+    if (!makePaymentModalOpen || !paymentFromAccountId) {
+      setPaymentBeneficiaries([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadBeneficiaries = async () => {
+      setLoadingPaymentBeneficiaries(true);
+      try {
+        const response = await fetch(
+          `http://localhost:5000/api/v1/beneficiaries/account/${paymentFromAccountId}`
+        );
+        const result = await response.json();
+        if (cancelled) {
+          return;
+        }
+        const rows = Array.isArray(result.data) ? result.data : [];
+        setPaymentBeneficiaries(rows.filter((b: BeneficiaryRow) => b.status === "ACTIVE"));
+      } catch {
+        if (!cancelled) {
+          setPaymentBeneficiaries([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingPaymentBeneficiaries(false);
+        }
+      }
+    };
+
+    void loadBeneficiaries();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [makePaymentModalOpen, paymentFromAccountId]);
+
+  const closeAddPayeeModal = () => {
+    setAddPayeeModalOpen(false);
+    setPayeeSubmitMessage("");
+  };
+
+  const handleAddPayeeSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+
+    const accountId = Number(formData.get("account_id"));
+    if (!Number.isInteger(accountId) || accountId <= 0) {
+      setPayeeSubmitMessage("Select a valid account.");
+      return;
+    }
+
+    const payload: Record<string, unknown> = {
+      account_id: accountId,
+      beneficiary_name: String(formData.get("beneficiary_name") || "").trim(),
+      beneficiary_account_number: String(formData.get("beneficiary_account_number") || "").trim(),
+      status: String(formData.get("status") || "ACTIVE"),
+    };
+
+    const ifsc = String(formData.get("ifsc_code") || "").trim().toUpperCase();
+    if (ifsc) {
+      payload.ifsc_code = ifsc;
+    }
+
+    const bankName = String(formData.get("bank_name") || "").trim();
+    if (bankName) {
+      payload.bank_name = bankName;
+    }
+
+    const nickname = String(formData.get("nickname") || "").trim();
+    if (nickname) {
+      payload.nickname = nickname;
+    }
+
+    setPayeeSubmitMessage("");
+
+    try {
+      setIsSubmittingPayee(true);
+      const response = await fetch("http://localhost:5000/api/v1/beneficiaries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const result = await response.json();
+
+      if (!response.ok) {
+        let msg = typeof result?.message === "string" ? result.message : "Could not add payee";
+        const fieldErrors = result?.errors?.fieldErrors as Record<string, string[]> | undefined;
+        if (fieldErrors && typeof fieldErrors === "object") {
+          const parts = Object.entries(fieldErrors).flatMap(([key, msgs]) =>
+            Array.isArray(msgs) ? msgs.map((m) => `${key}: ${m}`) : []
+          );
+          if (parts.length > 0) {
+            msg = parts.join("; ");
+          }
+        }
+        setPayeeSubmitMessage(msg);
+        return;
+      }
+
+      form.reset();
+      closeAddPayeeModal();
+    } catch {
+      setPayeeSubmitMessage("Unable to connect to backend API");
+    } finally {
+      setIsSubmittingPayee(false);
+    }
+  };
+
+  const closeMakePaymentModal = () => {
+    setMakePaymentModalOpen(false);
+    setPaymentSubmitMessage("");
+    setPaymentBeneficiaries([]);
+    setPaymentFromAccountId("");
+  };
+
+  const openMakePaymentModal = () => {
+    setPaymentSubmitMessage("");
+    setPaymentBeneficiaries([]);
+    setPaymentFromAccountId(accounts[0] ? String(accounts[0].account_id) : "");
+    setMakePaymentModalOpen(true);
+  };
+
+  const handleMakePaymentSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const customerIdRaw = sessionStorage.getItem("customerId");
+    const customerId = customerIdRaw ? Number(customerIdRaw) : NaN;
+
+    if (!Number.isInteger(customerId) || customerId <= 0) {
+      setPaymentSubmitMessage("Session expired. Please log in again.");
+      return;
+    }
+
+    const fromAccountId = Number(formData.get("from_account_id"));
+    const beneficiaryId = Number(formData.get("beneficiary_id"));
+    const amountRaw = String(formData.get("amount_in_inr") || "").trim();
+    const amount = Number.parseFloat(amountRaw);
+
+    if (!Number.isInteger(fromAccountId) || fromAccountId <= 0) {
+      setPaymentSubmitMessage("Select a valid from account.");
+      return;
+    }
+    if (!Number.isInteger(beneficiaryId) || beneficiaryId <= 0) {
+      setPaymentSubmitMessage("Select a payee.");
+      return;
+    }
+    if (Number.isNaN(amount) || amount <= 0) {
+      setPaymentSubmitMessage("Enter a valid amount in INR.");
+      return;
+    }
+
+    const payload: Record<string, unknown> = {
+      customer_id: customerId,
+      from_account_id: fromAccountId,
+      beneficiary_id: beneficiaryId,
+      amount,
+      currency_code: "INR",
+      transaction_type: "PAYMENT",
+      status: "COMPLETED",
+      payment_channel: String(formData.get("payment_channel") || "NETBANKING"),
+    };
+
+    const remarks = String(formData.get("remarks") || "").trim();
+    if (remarks) {
+      payload.remarks = remarks;
+    }
+
+    setPaymentSubmitMessage("");
+
+    try {
+      setIsSubmittingPayment(true);
+      const response = await fetch("http://localhost:5000/api/v1/transactions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const result = await response.json();
+
+      if (!response.ok) {
+        let msg = typeof result?.message === "string" ? result.message : "Payment could not be recorded";
+        const fieldErrors = result?.errors?.fieldErrors as Record<string, string[]> | undefined;
+        if (fieldErrors && typeof fieldErrors === "object") {
+          const parts = Object.entries(fieldErrors).flatMap(([key, msgs]) =>
+            Array.isArray(msgs) ? msgs.map((m) => `${key}: ${m}`) : []
+          );
+          if (parts.length > 0) {
+            msg = parts.join("; ");
+          }
+        }
+        setPaymentSubmitMessage(msg);
+        return;
+      }
+
+      form.reset();
+      closeMakePaymentModal();
+    } catch {
+      setPaymentSubmitMessage("Unable to connect to backend API");
+    } finally {
+      setIsSubmittingPayment(false);
+    }
+  };
+
   return (
     <main className="container py-4 py-md-5">
-      <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+      <div className="d-flex justify-content-between align-items-start align-items-md-center flex-wrap gap-3 mb-4">
         <div>
           <h1 className="h3 mb-1">Customer Dashboard</h1>
           <p className="text-muted mb-0">
@@ -170,13 +396,69 @@ export default function DashboardPage() {
                 : "Here is your latest financial overview."}
           </p>
         </div>
-        <Link
-          href="/login"
-          className="btn btn-outline-secondary"
-          onClick={() => sessionStorage.removeItem("customerId")}
-        >
-          Logout
-        </Link>
+
+        <div className="d-flex flex-wrap align-items-center gap-2 ms-md-auto">
+          <div className="dropdown">
+            <button
+              className="btn btn-outline-primary dropdown-toggle"
+              type="button"
+              data-bs-toggle="dropdown"
+              aria-expanded="false"
+            >
+              Manage Payee
+            </button>
+            <ul className="dropdown-menu dropdown-menu-end">
+              <li>
+                <button
+                  className="dropdown-item"
+                  type="button"
+                  onClick={() => {
+                    setPayeeSubmitMessage("");
+                    setAddPayeeModalOpen(true);
+                  }}
+                >
+                  Add Payee
+                </button>
+              </li>
+              <li>
+                <button className="dropdown-item" type="button">
+                  Remove Payee
+                </button>
+              </li>
+            </ul>
+          </div>
+
+          <div className="dropdown">
+            <button
+              className="btn btn-outline-primary dropdown-toggle"
+              type="button"
+              data-bs-toggle="dropdown"
+              aria-expanded="false"
+            >
+              Transactions
+            </button>
+            <ul className="dropdown-menu dropdown-menu-end">
+              <li>
+                <button className="dropdown-item" type="button" onClick={openMakePaymentModal}>
+                  Make Payment
+                </button>
+              </li>
+              <li>
+                <button className="dropdown-item" type="button">
+                  Statements
+                </button>
+              </li>
+            </ul>
+          </div>
+
+          <Link
+            href="/login"
+            className="btn btn-outline-secondary"
+            onClick={() => sessionStorage.removeItem("customerId")}
+          >
+            Logout
+          </Link>
+        </div>
       </div>
 
       <div className="row g-3 mb-4">
@@ -322,6 +604,339 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+
+      <div
+        className={`modal fade${addPayeeModalOpen ? " show d-block" : ""}`}
+        id="addPayeeModal"
+        tabIndex={-1}
+        role="dialog"
+        aria-modal={addPayeeModalOpen}
+        aria-labelledby="addPayeeModalLabel"
+        style={addPayeeModalOpen ? undefined : { display: "none" }}
+      >
+        <div className="modal-dialog modal-dialog-scrollable">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h2 className="modal-title h5" id="addPayeeModalLabel">
+                Add Payee
+              </h2>
+              <button
+                type="button"
+                className="btn-close"
+                aria-label="Close"
+                onClick={closeAddPayeeModal}
+                disabled={isSubmittingPayee}
+              />
+            </div>
+            <form onSubmit={handleAddPayeeSubmit}>
+              <div className="modal-body" style={{ maxHeight: "70vh", overflowY: "auto" }}>
+                <div className="row g-3">
+                  <div className="col-12">
+                    <label className="form-label" htmlFor="payeeAccountId">
+                      Your account <span className="text-danger">*</span>
+                    </label>
+                    <select
+                      id="payeeAccountId"
+                      name="account_id"
+                      className="form-select"
+                      defaultValue=""
+                      required
+                      disabled={accounts.length === 0}
+                    >
+                      <option value="" disabled>
+                        {accounts.length === 0 ? "No accounts available" : "Select account"}
+                      </option>
+                      {accounts.map((acc) => (
+                        <option key={acc.account_id} value={acc.account_id}>
+                          {acc.account_number} · {formatEnumLabel(acc.account_type)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="col-12">
+                    <label className="form-label" htmlFor="beneficiaryName">
+                      Beneficiary name <span className="text-danger">*</span>
+                    </label>
+                    <input
+                      id="beneficiaryName"
+                      name="beneficiary_name"
+                      type="text"
+                      className="form-control"
+                      placeholder="Full name as per bank"
+                      minLength={2}
+                      maxLength={150}
+                      required
+                    />
+                  </div>
+                  <div className="col-12">
+                    <label className="form-label" htmlFor="beneficiaryAccountNumber">
+                      Beneficiary account number <span className="text-danger">*</span>
+                    </label>
+                    <input
+                      id="beneficiaryAccountNumber"
+                      name="beneficiary_account_number"
+                      type="text"
+                      className="form-control"
+                      placeholder="Account / IBAN"
+                      minLength={5}
+                      maxLength={32}
+                      required
+                    />
+                  </div>
+                  <div className="col-12 col-md-6">
+                    <label className="form-label" htmlFor="ifscCode">
+                      IFSC code
+                    </label>
+                    <input
+                      id="ifscCode"
+                      name="ifsc_code"
+                      type="text"
+                      className="form-control text-uppercase"
+                      placeholder="e.g. HDFC0001234"
+                      maxLength={11}
+                      pattern="^[A-Z]{4}0[A-Z0-9]{6}$"
+                    />
+                    <div className="form-text">11 characters. Leave blank if not applicable.</div>
+                  </div>
+                  <div className="col-12 col-md-6">
+                    <label className="form-label" htmlFor="bankName">
+                      Bank name
+                    </label>
+                    <input
+                      id="bankName"
+                      name="bank_name"
+                      type="text"
+                      className="form-control"
+                      placeholder="Beneficiary bank"
+                      maxLength={150}
+                    />
+                  </div>
+                  <div className="col-12 col-md-6">
+                    <label className="form-label" htmlFor="nickname">
+                      Nickname
+                    </label>
+                    <input
+                      id="nickname"
+                      name="nickname"
+                      type="text"
+                      className="form-control"
+                      placeholder="Short label for this payee"
+                      maxLength={80}
+                    />
+                  </div>
+                  <div className="col-12 col-md-6">
+                    <label className="form-label" htmlFor="beneficiaryStatus">
+                      Status
+                    </label>
+                    <select id="beneficiaryStatus" name="status" className="form-select" defaultValue="ACTIVE">
+                      <option value="ACTIVE">Active</option>
+                      <option value="INACTIVE">Inactive</option>
+                      <option value="PENDING">Pending</option>
+                    </select>
+                  </div>
+                </div>
+                {payeeSubmitMessage ? (
+                  <div className="alert alert-danger mt-3 mb-0 py-2" role="alert">
+                    {payeeSubmitMessage}
+                  </div>
+                ) : null}
+              </div>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary"
+                  onClick={closeAddPayeeModal}
+                  disabled={isSubmittingPayee}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={isSubmittingPayee || accounts.length === 0}>
+                  {isSubmittingPayee ? "Saving…" : "Save payee"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+      {addPayeeModalOpen ? (
+        <div
+          className="modal-backdrop fade show"
+          role="presentation"
+          onClick={() => {
+            if (!isSubmittingPayee) {
+              closeAddPayeeModal();
+            }
+          }}
+        />
+      ) : null}
+
+      <div
+        className={`modal fade${makePaymentModalOpen ? " show d-block" : ""}`}
+        id="makePaymentModal"
+        tabIndex={-1}
+        role="dialog"
+        aria-modal={makePaymentModalOpen}
+        aria-labelledby="makePaymentModalLabel"
+        style={makePaymentModalOpen ? undefined : { display: "none" }}
+      >
+        <div className="modal-dialog modal-dialog-scrollable">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h2 className="modal-title h5" id="makePaymentModalLabel">
+                Make payment
+              </h2>
+              <button
+                type="button"
+                className="btn-close"
+                aria-label="Close"
+                onClick={closeMakePaymentModal}
+                disabled={isSubmittingPayment}
+              />
+            </div>
+            <form onSubmit={handleMakePaymentSubmit}>
+              <div className="modal-body" style={{ maxHeight: "70vh", overflowY: "auto" }}>
+                <div className="row g-3">
+                  <div className="col-12">
+                    <label className="form-label" htmlFor="paymentFromAccount">
+                      From account <span className="text-danger">*</span>
+                    </label>
+                    <select
+                      id="paymentFromAccount"
+                      name="from_account_id"
+                      className="form-select"
+                      value={paymentFromAccountId}
+                      onChange={(e) => setPaymentFromAccountId(e.target.value)}
+                      required
+                      disabled={accounts.length === 0}
+                    >
+                      <option value="" disabled>
+                        {accounts.length === 0 ? "No accounts available" : "Select your account"}
+                      </option>
+                      {accounts.map((acc) => (
+                        <option key={acc.account_id} value={String(acc.account_id)}>
+                          {acc.account_number} · {formatEnumLabel(acc.account_type)} ·{" "}
+                          {formatMoney(acc.available_balance, acc.currency_code)}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="form-text">Debit this account for the transfer.</div>
+                  </div>
+
+                  <div className="col-12">
+                    <label className="form-label" htmlFor="paymentBeneficiary">
+                      To account (payee) <span className="text-danger">*</span>
+                    </label>
+                    <select
+                      id="paymentBeneficiary"
+                      key={paymentFromAccountId || "no-from"}
+                      name="beneficiary_id"
+                      className="form-select"
+                      defaultValue=""
+                      required
+                      disabled={!paymentFromAccountId || loadingPaymentBeneficiaries || accounts.length === 0}
+                    >
+                      <option value="" disabled>
+                        {!paymentFromAccountId
+                          ? "Select from account first"
+                          : loadingPaymentBeneficiaries
+                            ? "Loading payees…"
+                            : paymentBeneficiaries.length === 0
+                              ? "No active payees for this account"
+                              : "Select payee"}
+                      </option>
+                      {paymentBeneficiaries.map((b) => (
+                        <option key={b.beneficiary_id} value={b.beneficiary_id}>
+                          {b.beneficiary_name} — {b.beneficiary_account_number}
+                          {b.nickname ? ` (${b.nickname})` : ""}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="form-text">Active payees linked to the selected account.</div>
+                  </div>
+
+                  <div className="col-12 col-md-6">
+                    <label className="form-label" htmlFor="paymentAmountInr">
+                      Amount (INR) <span className="text-danger">*</span>
+                    </label>
+                    <input
+                      id="paymentAmountInr"
+                      name="amount_in_inr"
+                      type="number"
+                      inputMode="decimal"
+                      className="form-control"
+                      placeholder="0.00"
+                      min={0.01}
+                      step={0.01}
+                      required
+                    />
+                    <div className="form-text">Numbers only; paise up to two decimal places.</div>
+                  </div>
+
+                  <div className="col-12 col-md-6">
+                    <label className="form-label" htmlFor="paymentChannel">
+                      Payment channel
+                    </label>
+                    <select id="paymentChannel" name="payment_channel" className="form-select" defaultValue="NETBANKING">
+                      <option value="NETBANKING">Net banking</option>
+                      <option value="MOBILE">Mobile</option>
+                      <option value="BRANCH">Branch</option>
+                    </select>
+                  </div>
+
+                  <div className="col-12">
+                    <label className="form-label" htmlFor="paymentRemarks">
+                      Remarks (optional)
+                    </label>
+                    <textarea
+                      id="paymentRemarks"
+                      name="remarks"
+                      className="form-control"
+                      rows={2}
+                      maxLength={255}
+                      placeholder="Note for your records"
+                    />
+                  </div>
+                </div>
+                {paymentSubmitMessage ? (
+                  <div className="alert alert-danger mt-3 mb-0 py-2" role="alert">
+                    {paymentSubmitMessage}
+                  </div>
+                ) : null}
+              </div>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary"
+                  onClick={closeMakePaymentModal}
+                  disabled={isSubmittingPayment}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={
+                    isSubmittingPayment || accounts.length === 0 || !paymentFromAccountId || paymentBeneficiaries.length === 0
+                  }
+                >
+                  {isSubmittingPayment ? "Processing…" : "Pay now"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+      {makePaymentModalOpen ? (
+        <div
+          className="modal-backdrop fade show"
+          role="presentation"
+          onClick={() => {
+            if (!isSubmittingPayment) {
+              closeMakePaymentModal();
+            }
+          }}
+        />
+      ) : null}
     </main>
   );
 }
