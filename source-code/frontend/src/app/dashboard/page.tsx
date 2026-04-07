@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 
 type AccountRow = {
   account_id: number;
@@ -40,6 +40,17 @@ type CustomerRow = {
   status: string;
   created_at?: string;
   updated_at?: string;
+};
+
+type LoanTypeRow = {
+  loan_type_id: number;
+  loan_type: "Personal" | "Home" | "Gold" | "Property" | "Car";
+  roi: number;
+  min_tenure: number;
+  max_tenure: number;
+  status: "ACTIVE" | "INACTIVE";
+  created_date?: string;
+  updated_date?: string;
 };
 
 const loanSummary = [
@@ -98,6 +109,19 @@ function formatMoney(amount: string | number, currencyCode: string) {
   }
 }
 
+/** ISO date `YYYY-MM-DD` plus whole calendar months (loan tenure). */
+function addMonthsToIsoDate(isoDate: string, months: number): string {
+  const [y, m, d] = isoDate.split("-").map(Number);
+  if (!y || !m || !d || !Number.isFinite(months)) {
+    return "";
+  }
+  const dt = new Date(y, m - 1 + months, d);
+  const yy = dt.getFullYear();
+  const mm = String(dt.getMonth() + 1).padStart(2, "0");
+  const dd = String(dt.getDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const [accounts, setAccounts] = useState<AccountRow[]>([]);
@@ -113,6 +137,34 @@ export default function DashboardPage() {
   const [loadingPaymentBeneficiaries, setLoadingPaymentBeneficiaries] = useState(false);
   const [paymentSubmitMessage, setPaymentSubmitMessage] = useState("");
   const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
+  const [applyLoanModalOpen, setApplyLoanModalOpen] = useState(false);
+  const [loanTypes, setLoanTypes] = useState<LoanTypeRow[]>([]);
+  const [loadingLoanTypes, setLoadingLoanTypes] = useState(false);
+  const [loanTypesLoadError, setLoanTypesLoadError] = useState("");
+  const [applyLoanSubmitMessage, setApplyLoanSubmitMessage] = useState("");
+  const [isSubmittingLoan, setIsSubmittingLoan] = useState(false);
+  const [applyLoanSelectedTypeId, setApplyLoanSelectedTypeId] = useState("");
+  const [applyLoanStartDate, setApplyLoanStartDate] = useState("");
+  const [applyLoanTenureStr, setApplyLoanTenureStr] = useState("");
+
+  const selectedApplyLoanTypeMeta = useMemo(() => {
+    if (!applyLoanSelectedTypeId) {
+      return null;
+    }
+    return loanTypes.find((lt) => String(lt.loan_type_id) === applyLoanSelectedTypeId) ?? null;
+  }, [loanTypes, applyLoanSelectedTypeId]);
+
+  const applyLoanComputedEndDate = useMemo(() => {
+    const start = applyLoanStartDate.trim();
+    const tenureMonths = Number(applyLoanTenureStr.trim());
+    if (!start || !/^\d{4}-\d{2}-\d{2}$/.test(start)) {
+      return "";
+    }
+    if (!Number.isInteger(tenureMonths) || tenureMonths <= 0) {
+      return "";
+    }
+    return addMonthsToIsoDate(start, tenureMonths);
+  }, [applyLoanStartDate, applyLoanTenureStr]);
 
   useEffect(() => {
     const customerId = sessionStorage.getItem("customerId");
@@ -214,6 +266,47 @@ export default function DashboardPage() {
       cancelled = true;
     };
   }, [makePaymentModalOpen, paymentFromAccountId]);
+
+  useEffect(() => {
+    if (!applyLoanModalOpen) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadLoanTypes = async () => {
+      setLoadingLoanTypes(true);
+      setLoanTypesLoadError("");
+      try {
+        const response = await fetch("http://localhost:5000/api/v1/loan-types");
+        const result = await response.json();
+        if (cancelled) {
+          return;
+        }
+        if (response.ok && Array.isArray(result.data)) {
+          setLoanTypes(result.data as LoanTypeRow[]);
+        } else {
+          setLoanTypes([]);
+          setLoanTypesLoadError(typeof result?.message === "string" ? result.message : "Could not load loan types");
+        }
+      } catch {
+        if (!cancelled) {
+          setLoanTypes([]);
+          setLoanTypesLoadError("Unable to connect to backend API");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingLoanTypes(false);
+        }
+      }
+    };
+
+    void loadLoanTypes();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [applyLoanModalOpen]);
 
   const closeAddPayeeModal = () => {
     setAddPayeeModalOpen(false);
@@ -383,6 +476,110 @@ export default function DashboardPage() {
     }
   };
 
+  const closeApplyLoanModal = () => {
+    setApplyLoanModalOpen(false);
+    setApplyLoanSubmitMessage("");
+    setLoanTypesLoadError("");
+    setApplyLoanSelectedTypeId("");
+    setApplyLoanStartDate("");
+    setApplyLoanTenureStr("");
+  };
+
+  const openApplyLoanModal = () => {
+    setApplyLoanSubmitMessage("");
+    setLoanTypesLoadError("");
+    setApplyLoanSelectedTypeId("");
+    setApplyLoanStartDate("");
+    setApplyLoanTenureStr("");
+    setApplyLoanModalOpen(true);
+  };
+
+  const handleApplyLoanSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const customerIdRaw = sessionStorage.getItem("customerId");
+    const customerId = customerIdRaw ? Number(customerIdRaw) : Number.NaN;
+
+    if (!Number.isInteger(customerId) || customerId <= 0) {
+      setApplyLoanSubmitMessage("Session expired. Please log in again.");
+      return;
+    }
+
+    const loanTypeId = Number(formData.get("loan_type_id"));
+    const principalRaw = String(formData.get("principal_amount") || "").trim();
+    const tenureMonths = Number(applyLoanTenureStr.trim());
+    const chosenType = loanTypes.find((lt) => lt.loan_type_id === loanTypeId);
+    if (chosenType) {
+      if (!Number.isInteger(tenureMonths) || tenureMonths <= 0) {
+        setApplyLoanSubmitMessage("Enter a valid whole number of months for tenure.");
+        return;
+      }
+      if (tenureMonths < chosenType.min_tenure || tenureMonths > chosenType.max_tenure) {
+        setApplyLoanSubmitMessage(
+          `Tenure must be between ${chosenType.min_tenure} and ${chosenType.max_tenure} months for ${chosenType.loan_type} loans.`
+        );
+        return;
+      }
+    }
+
+    const payload: Record<string, unknown> = {
+      loan_type_id: loanTypeId,
+      customer_id: customerId,
+      principal_amount: Number.parseFloat(principalRaw),
+      tenure_months: tenureMonths,
+    };
+
+    const linkedRaw = String(formData.get("linked_account_id") || "").trim();
+    if (linkedRaw) {
+      payload.linked_account_id = Number(linkedRaw);
+    }
+
+    const startDate = applyLoanStartDate.trim();
+    const endDate = applyLoanComputedEndDate.trim();
+    if (startDate) {
+      payload.start_date = startDate;
+    }
+    if (endDate) {
+      payload.end_date = endDate;
+    }
+
+    setApplyLoanSubmitMessage("");
+
+    try {
+      setIsSubmittingLoan(true);
+      const response = await fetch("http://localhost:5000/api/v1/loans", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const result = await response.json();
+
+      if (!response.ok) {
+        let msg =
+          typeof result?.message === "string" ? result.message : "Could not submit loan application";
+        const fieldErrors = result?.errors?.fieldErrors as Record<string, string[]> | undefined;
+        if (fieldErrors && typeof fieldErrors === "object") {
+          const parts = Object.entries(fieldErrors).flatMap(([key, msgs]) =>
+            Array.isArray(msgs) ? msgs.map((m) => `${key}: ${m}`) : []
+          );
+          if (parts.length > 0) {
+            msg = parts.join("; ");
+          }
+        }
+        setApplyLoanSubmitMessage(msg);
+        return;
+      }
+
+      form.reset();
+      closeApplyLoanModal();
+    } catch {
+      setApplyLoanSubmitMessage("Unable to connect to backend API");
+    } finally {
+      setIsSubmittingLoan(false);
+    }
+  };
+
   return (
     <main className="container py-4 py-md-5">
       <div className="d-flex justify-content-between align-items-start align-items-md-center flex-wrap gap-3 mb-4">
@@ -446,6 +643,34 @@ export default function DashboardPage() {
               <li>
                 <button className="dropdown-item" type="button">
                   Statements
+                </button>
+              </li>
+            </ul>
+          </div>
+
+          <div className="dropdown">
+            <button
+              className="btn btn-outline-primary dropdown-toggle"
+              type="button"
+              data-bs-toggle="dropdown"
+              aria-expanded="false"
+            >
+              Loans
+            </button>
+            <ul className="dropdown-menu dropdown-menu-end">
+              <li>
+                <button className="dropdown-item" type="button" onClick={openApplyLoanModal}>
+                  Apply Loan
+                </button>
+              </li>
+              <li>
+                <button className="dropdown-item" type="button">
+                  Foreclose Request
+                </button>
+              </li>
+              <li>
+                <button className="dropdown-item" type="button">
+                  Statement
                 </button>
               </li>
             </ul>
@@ -933,6 +1158,252 @@ export default function DashboardPage() {
           onClick={() => {
             if (!isSubmittingPayment) {
               closeMakePaymentModal();
+            }
+          }}
+        />
+      ) : null}
+
+      <div
+        className={`modal fade${applyLoanModalOpen ? " show d-block" : ""}`}
+        id="applyLoanModal"
+        tabIndex={-1}
+        role="dialog"
+        aria-modal={applyLoanModalOpen}
+        aria-labelledby="applyLoanModalLabel"
+        style={applyLoanModalOpen ? undefined : { display: "none" }}
+      >
+        <div className="modal-dialog modal-dialog-scrollable modal-lg">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h2 className="modal-title h5" id="applyLoanModalLabel">
+                Apply for loan
+              </h2>
+              <button
+                type="button"
+                className="btn-close"
+                aria-label="Close"
+                onClick={closeApplyLoanModal}
+                disabled={isSubmittingLoan}
+              />
+            </div>
+            <form key={applyLoanModalOpen ? "apply-loan-open" : "apply-loan-closed"} onSubmit={handleApplyLoanSubmit}>
+              <div className="modal-body" style={{ maxHeight: "70vh", overflowY: "auto" }}>
+                {loanTypesLoadError ? (
+                  <div className="alert alert-warning py-2" role="alert">
+                    {loanTypesLoadError}
+                  </div>
+                ) : null}
+                <div className="alert alert-info py-2 mb-3" role="alert">
+                  Loan account number is auto-generated when you submit the application.
+                </div>
+                <div className="row g-3">
+                  <div className="col-12 col-md-6">
+                    <label className="form-label" htmlFor="loanTypeId">
+                      Loan type <span className="text-danger">*</span>
+                    </label>
+                    <select
+                      id="loanTypeId"
+                      name="loan_type_id"
+                      className="form-select"
+                      value={applyLoanSelectedTypeId}
+                      onChange={(e) => {
+                        const nextId = e.target.value;
+                        setApplyLoanSelectedTypeId(nextId);
+                        const lt = loanTypes.find((x) => String(x.loan_type_id) === nextId);
+                        if (lt) {
+                          setApplyLoanTenureStr(String(lt.min_tenure));
+                        }
+                      }}
+                      required
+                      disabled={isSubmittingLoan || loadingLoanTypes || loanTypes.length === 0}
+                    >
+                      <option value="" disabled>
+                        {loadingLoanTypes
+                          ? "Loading loan types…"
+                          : loanTypes.length === 0
+                            ? "No loan types available"
+                            : "Select loan type"}
+                      </option>
+                      {loanTypes.map((lt) => (
+                        <option key={lt.loan_type_id} value={String(lt.loan_type_id)}>
+                          {lt.loan_type} — ROI {lt.roi}% · {lt.min_tenure}–{lt.max_tenure} mo.
+                        </option>
+                      ))}
+                    </select>
+                    {selectedApplyLoanTypeMeta ? (
+                      <div className="form-text">
+                        Reference rate (ROI): {selectedApplyLoanTypeMeta.roi}% p.a. Allowed tenure:{" "}
+                        {selectedApplyLoanTypeMeta.min_tenure}–{selectedApplyLoanTypeMeta.max_tenure} months.
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className="col-12 col-md-6">
+                    <label className="form-label" htmlFor="loanLinkedAccountId">
+                      Linked account
+                    </label>
+                    <select
+                      id="loanLinkedAccountId"
+                      name="linked_account_id"
+                      className="form-select"
+                      defaultValue=""
+                      disabled={isSubmittingLoan || accounts.length === 0}
+                    >
+                      <option value="">None</option>
+                      {accounts.map((acc) => (
+                        <option key={acc.account_id} value={acc.account_id}>
+                          {acc.account_number} · {formatEnumLabel(acc.account_type)}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="form-text">Optional savings/current account to link.</div>
+                  </div>
+                  <div className="col-12 col-md-6">
+                    <label className="form-label" htmlFor="loanPrincipalAmount">
+                      Principal amount <span className="text-danger">*</span>
+                    </label>
+                    <input
+                      id="loanPrincipalAmount"
+                      name="principal_amount"
+                      type="number"
+                      inputMode="decimal"
+                      className="form-control"
+                      placeholder="0.00"
+                      min={0.01}
+                      step={0.01}
+                      required
+                      disabled={isSubmittingLoan}
+                    />
+                  </div>
+                  <div className="col-12 col-md-6">
+                    <label className="form-label" htmlFor="loanDisbursedAmount">
+                      Disbursed amount
+                    </label>
+                    <input
+                      id="loanDisbursedAmount"
+                      type="text"
+                      className="form-control"
+                      value="0.00"
+                      readOnly
+                      disabled
+                      aria-readonly="true"
+                    />
+                    <div className="form-text">Set to zero at application; updated after disbursement.</div>
+                  </div>
+                  <div className="col-12 col-md-6">
+                    <label className="form-label" htmlFor="loanInterestRate">
+                      Interest rate (annual %)
+                    </label>
+                    <input
+                      id="loanInterestRate"
+                      type="text"
+                      className="form-control"
+                      value={selectedApplyLoanTypeMeta ? `${selectedApplyLoanTypeMeta.roi}%` : "Select loan type first"}
+                      readOnly
+                      disabled
+                      aria-readonly="true"
+                    />
+                    <div className="form-text">Rate is auto-selected from loan type and cannot be edited.</div>
+                  </div>
+                  <div className="col-12 col-md-6">
+                    <label className="form-label" htmlFor="loanTenureMonths">
+                      Tenure (months) <span className="text-danger">*</span>
+                    </label>
+                    <input
+                      id="loanTenureMonths"
+                      name="tenure_months"
+                      type="number"
+                      inputMode="numeric"
+                      className="form-control"
+                      placeholder={
+                        selectedApplyLoanTypeMeta
+                          ? `${selectedApplyLoanTypeMeta.min_tenure}–${selectedApplyLoanTypeMeta.max_tenure}`
+                          : "Select loan type first"
+                      }
+                      value={applyLoanTenureStr}
+                      onChange={(e) => setApplyLoanTenureStr(e.target.value)}
+                      min={selectedApplyLoanTypeMeta?.min_tenure ?? 1}
+                      max={selectedApplyLoanTypeMeta?.max_tenure ?? 600}
+                      step={1}
+                      required
+                      disabled={isSubmittingLoan || !applyLoanSelectedTypeId}
+                    />
+                  </div>
+                  <div className="col-12 col-md-6">
+                    <label className="form-label" htmlFor="loanStartDate">
+                      Start date
+                    </label>
+                    <input
+                      id="loanStartDate"
+                      name="start_date"
+                      type="date"
+                      className="form-control"
+                      value={applyLoanStartDate}
+                      onChange={(e) => setApplyLoanStartDate(e.target.value)}
+                      disabled={isSubmittingLoan}
+                    />
+                  </div>
+                  <div className="col-12 col-md-6">
+                    <label className="form-label" htmlFor="loanEndDate">
+                      End date
+                    </label>
+                    <input
+                      id="loanEndDate"
+                      type="date"
+                      className="form-control bg-body-secondary"
+                      value={applyLoanComputedEndDate}
+                      readOnly
+                      tabIndex={-1}
+                      aria-readonly="true"
+                      autoComplete="off"
+                    />
+                    <div className="form-text">
+                      {applyLoanComputedEndDate
+                        ? `Auto-calculated from start date + tenure (${formatDate(applyLoanComputedEndDate)}).`
+                        : "Set start date and tenure to calculate end date."}
+                    </div>
+                  </div>
+                  <div className="col-12 col-md-6">
+                    <p className="form-label mb-1">Loan status</p>
+                    <p className="form-control-plaintext mb-0 fw-semibold" id="loanStatusReadonly">
+                      APPLIED
+                    </p>
+                    <div className="form-text">New applications are recorded as APPLIED.</div>
+                  </div>
+                </div>
+                {applyLoanSubmitMessage ? (
+                  <div className="alert alert-danger mt-3 mb-0 py-2" role="alert">
+                    {applyLoanSubmitMessage}
+                  </div>
+                ) : null}
+              </div>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary"
+                  onClick={closeApplyLoanModal}
+                  disabled={isSubmittingLoan}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={isSubmittingLoan || loadingLoanTypes || loanTypes.length === 0}
+                >
+                  {isSubmittingLoan ? "Submitting…" : "Submit application"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+      {applyLoanModalOpen ? (
+        <div
+          className="modal-backdrop fade show"
+          role="presentation"
+          onClick={() => {
+            if (!isSubmittingLoan) {
+              closeApplyLoanModal();
             }
           }}
         />
