@@ -60,7 +60,40 @@ const findLoanById = async (loanId) => {
   return rows[0] || null;
 };
 
+const findLoansByCustomerId = async (customerId) => {
+  const query = `
+    SELECT
+      l.loan_id,
+      l.loan_account_number,
+      l.loan_type_id,
+      lt.loan_type,
+      lt.roi AS product_roi,
+      l.customer_id,
+      l.linked_account_id,
+      a.account_number AS linked_account_number,
+      l.principal_amount,
+      l.disbursed_amount,
+      l.interest_rate_annual,
+      l.tenure_months,
+      l.start_date,
+      l.end_date,
+      l.loan_status,
+      l.created_at,
+      l.updated_at
+    FROM loans l
+    LEFT JOIN loan_types lt
+      ON lt.loan_type_id = l.loan_type_id
+    LEFT JOIN accounts a
+      ON a.account_id = l.linked_account_id
+    WHERE l.customer_id = ?
+    ORDER BY l.created_at DESC, l.loan_id DESC
+  `;
+  const [rows] = await pool.execute(query, [customerId]);
+  return rows;
+};
+
 module.exports = {
   insertLoan,
   findLoanById,
+  findLoansByCustomerId,
 };

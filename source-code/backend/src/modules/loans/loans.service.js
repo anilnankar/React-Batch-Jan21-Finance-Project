@@ -2,7 +2,7 @@ const AppError = require("../../utils/app-error");
 const { findCustomerById } = require("../customers/customers.repository");
 const { findAccountWithCustomer } = require("../accounts/accounts.repository");
 const { findLoanTypeById } = require("./loan-types.repository");
-const { insertLoan, findLoanById } = require("./loans.repository");
+const { insertLoan, findLoanById, findLoansByCustomerId } = require("./loans.repository");
 
 const toMoney2 = (value) => Math.round(Number(value) * 100) / 100;
 const toRate4 = (value) => Math.round(Number(value) * 10000) / 10000;
@@ -100,6 +100,11 @@ const createLoan = async (payload) => {
   return saved;
 };
 
+const getLoansByCustomerId = async (customerId) => {
+  return findLoansByCustomerId(customerId);
+};
+
 module.exports = {
   createLoan,
+  getLoansByCustomerId,
 };

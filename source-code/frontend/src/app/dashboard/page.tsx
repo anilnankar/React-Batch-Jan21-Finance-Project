@@ -53,10 +53,25 @@ type LoanTypeRow = {
   updated_date?: string;
 };
 
-const loanSummary = [
-  { loanId: "HL-7781", loanType: "Home Loan", outstanding: "INR 24,10,000", emi: "INR 28,500", status: "Running" },
-  { loanId: "PL-5520", loanType: "Personal Loan", outstanding: "INR 1,15,000", emi: "INR 9,250", status: "Running" },
-];
+type LoanRow = {
+  loan_id: number;
+  loan_account_number: string;
+  loan_type_id: number;
+  loan_type: string | null;
+  product_roi: string | number | null;
+  customer_id: number;
+  linked_account_id: number | null;
+  linked_account_number: string | null;
+  principal_amount: string;
+  disbursed_amount: string;
+  interest_rate_annual: string;
+  tenure_months: number;
+  start_date: string | null;
+  end_date: string | null;
+  loan_status: "APPLIED" | "APPROVED" | "DISBURSED" | "ACTIVE" | "CLOSED" | "NPA" | "WRITTEN_OFF";
+  created_at: string;
+  updated_at: string;
+};
 
 function formatEnumLabel(value: string) {
   return value
@@ -109,6 +124,19 @@ function formatMoney(amount: string | number, currencyCode: string) {
   }
 }
 
+function loanStatusBadgeClass(status: LoanRow["loan_status"]) {
+  if (status === "ACTIVE" || status === "DISBURSED" || status === "APPROVED") {
+    return "text-bg-success";
+  }
+  if (status === "APPLIED") {
+    return "text-bg-info";
+  }
+  if (status === "NPA" || status === "WRITTEN_OFF") {
+    return "text-bg-danger";
+  }
+  return "text-bg-secondary";
+}
+
 /** ISO date `YYYY-MM-DD` plus whole calendar months (loan tenure). */
 function addMonthsToIsoDate(isoDate: string, months: number): string {
   const [y, m, d] = isoDate.split("-").map(Number);
@@ -144,6 +172,7 @@ export default function DashboardPage() {
   const [applyLoanSubmitMessage, setApplyLoanSubmitMessage] = useState("");
   const [isSubmittingLoan, setIsSubmittingLoan] = useState(false);
   const [applyLoanSelectedTypeId, setApplyLoanSelectedTypeId] = useState("");
+  const [customerLoans, setCustomerLoans] = useState<LoanRow[]>([]);
   const [applyLoanStartDate, setApplyLoanStartDate] = useState("");
   const [applyLoanTenureStr, setApplyLoanTenureStr] = useState("");
 
@@ -180,13 +209,15 @@ export default function DashboardPage() {
       try {
         setIsLoading(true);
         const base = "http://localhost:5000/api/v1";
-        const [accountsRes, customerRes] = await Promise.all([
+        const [accountsRes, customerRes, loansRes] = await Promise.all([
           fetch(`${base}/accounts/customer/${customerId}`),
           fetch(`${base}/customers/${customerId}`),
+          fetch(`${base}/loans/customer/${customerId}`),
         ]);
 
         const accountsJson = await accountsRes.json();
         const customerJson = await customerRes.json();
+        const loansJson = await loansRes.json();
 
         if (cancelled) {
           return;
@@ -208,12 +239,20 @@ export default function DashboardPage() {
           messages.push(customerJson?.message || "Could not load customer profile");
         }
 
+        if (loansRes.ok) {
+          setCustomerLoans(Array.isArray(loansJson.data) ? (loansJson.data as LoanRow[]) : []);
+        } else {
+          setCustomerLoans([]);
+          messages.push(loansJson?.message || "Could not load loans");
+        }
+
         setLoadError(messages.join(" "));
       } catch {
         if (!cancelled) {
           setLoadError("Unable to connect to backend API");
           setAccounts([]);
           setCustomer(null);
+          setCustomerLoans([]);
         }
       } finally {
         if (!cancelled) {
@@ -699,7 +738,13 @@ export default function DashboardPage() {
           <div className="card h-100 border-2">
             <div className="card-body">
               <p className="text-muted mb-1">Active Loans</p>
-              <h2 className="h4 mb-0">{loanSummary.length}</h2>
+              <h2 className="h4 mb-0">
+                {isLoading
+                  ? "…"
+                  : customerLoans.filter((loan) =>
+                      ["ACTIVE", "APPROVED", "DISBURSED"].includes(loan.loan_status)
+                    ).length}
+              </h2>
             </div>
           </div>
         </div>
@@ -763,17 +808,37 @@ export default function DashboardPage() {
             <div className="card-body">
               <h2 className="h5 mb-3">Loan Details</h2>
               <div className="d-grid gap-3">
-                {loanSummary.map((loan) => (
-                  <div className="border rounded p-3" key={loan.loanId}>
-                    <div className="d-flex justify-content-between mb-1">
-                      <strong>{loan.loanType}</strong>
-                      <span className="badge text-bg-warning">{loan.status}</span>
-                    </div>
-                    <div className="small text-muted">{loan.loanId}</div>
-                    <div className="mt-2">Outstanding: {loan.outstanding}</div>
-                    <div>EMI: {loan.emi}</div>
-                  </div>
-                ))}
+                {isLoading ? (
+                  <p className="text-muted mb-0">Loading loans…</p>
+                ) : customerLoans.length === 0 ? (
+                  <p className="text-muted mb-0">No loans found for this customer.</p>
+                ) : (
+                  customerLoans.map((loan) => {
+                    const principal = Number.parseFloat(loan.principal_amount || "0");
+                    const disbursed = Number.parseFloat(loan.disbursed_amount || "0");
+                    const outstanding = Number.isFinite(principal - disbursed) ? principal - disbursed : principal;
+                    return (
+                      <div className="border rounded p-3" key={loan.loan_id}>
+                        <div className="d-flex justify-content-between mb-1">
+                          <strong>{loan.loan_type || "Loan"}</strong>
+                          <span className={`badge ${loanStatusBadgeClass(loan.loan_status)}`}>
+                            {formatEnumLabel(loan.loan_status)}
+                          </span>
+                        </div>
+                        <div className="small text-muted">{loan.loan_account_number}</div>
+                        <div className="mt-2">
+                          Principal: {formatMoney(loan.principal_amount, "INR")}
+                        </div>
+                        <div>Outstanding: {formatMoney(outstanding, "INR")}</div>
+                        <div>Rate: {loan.interest_rate_annual}% p.a.</div>
+                        <div>Tenure: {loan.tenure_months} months</div>
+                        <div>
+                          Period: {formatDate(loan.start_date)} to {formatDate(loan.end_date)}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
           </div>
