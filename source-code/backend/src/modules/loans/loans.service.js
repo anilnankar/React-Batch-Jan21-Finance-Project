@@ -104,7 +104,7 @@ const createLoan = async (payload) => {
 
 const createLoanDocument = async (payload) => {
   const loan = await findLoanById(payload.loan_id);
-  if (!customer) {
+  if (!loan) {
     throw new AppError("Loan not found", 404);
   }
 

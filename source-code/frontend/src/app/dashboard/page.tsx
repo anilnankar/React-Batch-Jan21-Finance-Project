@@ -532,7 +532,9 @@ export default function DashboardPage() {
     const form = event.currentTarget;
     const formData = new FormData(form);
     const documentType = formData.get("document_type");
-    const documentFile = formData.get("document_file");
+    const documentFile = formData.get("document_file") as File;
+
+    console.log(documentFile?.name); // ✅ actual file name
 
     if (documentType == "") {
       setSubmitDocumentMessage("Select a document type.");
@@ -541,7 +543,7 @@ export default function DashboardPage() {
     const payload: Record<string, unknown> = {
       loan_id: submitDocumentLoanId,
       document_type: documentType,
-      document_file: documentFile,
+      document_file: documentFile?.name,
       status: "Pending"
     };
     console.log(payload, "payload");
@@ -1607,7 +1609,6 @@ export default function DashboardPage() {
                       id="document_type"
                       name="document_type"
                       className="form-select"
-                      value={}
                       required
                     >
                       <option value="adhhar">Adhar</option>
