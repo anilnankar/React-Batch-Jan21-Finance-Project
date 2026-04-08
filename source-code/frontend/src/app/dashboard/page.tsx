@@ -160,6 +160,10 @@ export default function DashboardPage() {
   const [payeeSubmitMessage, setPayeeSubmitMessage] = useState("");
   const [isSubmittingPayee, setIsSubmittingPayee] = useState(false);
   const [makePaymentModalOpen, setMakePaymentModalOpen] = useState(false);
+  const [submitDocumentModalOpen, setSubmitDocumentModalOpen] = useState(false);
+  const [submitDocumentLoanId, setSubmitDocumentLoanId] = useState();
+  const [submitDocumentMessage, setSubmitDocumentMessage] = useState("");
+  const [isSubmittingDocument, setIsSubmittingDocument] = useState(false);
   const [paymentFromAccountId, setPaymentFromAccountId] = useState("");
   const [paymentBeneficiaries, setPaymentBeneficiaries] = useState<BeneficiaryRow[]>([]);
   const [loadingPaymentBeneficiaries, setLoadingPaymentBeneficiaries] = useState(false);
@@ -427,6 +431,12 @@ export default function DashboardPage() {
     setPaymentFromAccountId("");
   };
 
+  
+  const closeSubmitDocumentModalOpen = () => {
+    setSubmitDocumentModalOpen(false);
+  };
+ 
+
   const openMakePaymentModal = () => {
     setPaymentSubmitMessage("");
     setPaymentBeneficiaries([]);
@@ -515,6 +525,61 @@ export default function DashboardPage() {
     }
   };
 
+
+  
+  const handleSubmitDocumentAction = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const documentType = formData.get("document_type");
+    const documentFile = formData.get("document_file");
+
+    if (documentType == "") {
+      setSubmitDocumentMessage("Select a document type.");
+      return;
+    }
+    const payload: Record<string, unknown> = {
+      loan_id: submitDocumentLoanId,
+      document_type: documentType,
+      document_file: documentFile,
+      status: "Pending"
+    };
+    console.log(payload, "payload");
+    setSubmitDocumentMessage("");
+
+    try {
+      setIsSubmittingDocument(true);
+      const response = await fetch("http://localhost:5000/api/v1/loan-documents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const result = await response.json();
+
+      if (!response.ok) {
+        let msg = typeof result?.message === "string" ? result.message : "Payment could not be recorded";
+        const fieldErrors = result?.errors?.fieldErrors as Record<string, string[]> | undefined;
+        if (fieldErrors && typeof fieldErrors === "object") {
+          const parts = Object.entries(fieldErrors).flatMap(([key, msgs]) =>
+            Array.isArray(msgs) ? msgs.map((m) => `${key}: ${m}`) : []
+          );
+          if (parts.length > 0) {
+            msg = parts.join("; ");
+          }
+        }
+        setSubmitDocumentMessage(msg);
+        return;
+      }
+
+      form.reset();
+      closeSubmitDocumentModalOpen();
+    } catch {
+      setSubmitDocumentMessage("Unable to connect to backend API");
+    } finally {
+      setIsSubmittingDocument(false);
+    }
+  };
+
   const closeApplyLoanModal = () => {
     setApplyLoanModalOpen(false);
     setApplyLoanSubmitMessage("");
@@ -531,6 +596,12 @@ export default function DashboardPage() {
     setApplyLoanStartDate("");
     setApplyLoanTenureStr("");
     setApplyLoanModalOpen(true);
+  };
+
+  
+  const openSubmitDocumentLoanModal = (loan_id) => {
+    setSubmitDocumentModalOpen(true);
+    setSubmitDocumentLoanId(loan_id)
   };
 
   const handleApplyLoanSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -824,6 +895,34 @@ export default function DashboardPage() {
                           <span className={`badge ${loanStatusBadgeClass(loan.loan_status)}`}>
                             {formatEnumLabel(loan.loan_status)}
                           </span>
+                          <div className="dropdown">
+                            <button
+                              className="btn btn-outline-primary dropdown-toggle"
+                              type="button"
+                              data-bs-toggle="dropdown"
+                              aria-expanded="false"
+                            >
+                              Actions
+                            </button>
+                            <ul className="dropdown-menu dropdown-menu-end">
+                              <li>
+                                <button className="dropdown-item" type="button" onClick={() =>openSubmitDocumentLoanModal(loan.loan_id)}>
+                                  Submit Document
+                                </button>
+                              </li>
+                              <li>
+                                <button className="dropdown-item" type="button">
+                                  View Document
+                                </button>
+                              </li>
+                              <li>
+                                <button className="dropdown-item" type="button">
+                                  Cancel Loan
+                                </button>
+                              </li>
+                            </ul>
+                          </div>
+
                         </div>
                         <div className="small text-muted">{loan.loan_account_number}</div>
                         <div className="mt-2">
@@ -1473,6 +1572,96 @@ export default function DashboardPage() {
           }}
         />
       ) : null}
+
+    <div
+        className={`modal fade${submitDocumentModalOpen ? " show d-block" : ""}`}
+        id="makePaymentModal"
+        tabIndex={-1}
+        role="dialog"
+        aria-modal={submitDocumentModalOpen}
+        aria-labelledby="makePaymentModalLabel"
+        style={submitDocumentModalOpen ? undefined : { display: "none" }}
+      >
+        <div className="modal-dialog modal-dialog-scrollable">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h2 className="modal-title h5" id="makePaymentModalLabel">
+                Submit Document for Loan
+              </h2>
+              <button
+                type="button"
+                className="btn-close"
+                aria-label="Close"
+                onClick={closeSubmitDocumentModalOpen}
+                disabled={isSubmittingDocument}
+              />
+            </div>
+            <form onSubmit={handleSubmitDocumentAction}>
+              <div className="modal-body" style={{ maxHeight: "70vh", overflowY: "auto" }}>
+                <div className="row g-3">
+                  <div className="col-12">
+                    <label className="form-label" htmlFor="paymentFromAccount">
+                      Select Document Type<span className="text-danger">*</span>
+                    </label>
+                    <select
+                      id="document_type"
+                      name="document_type"
+                      className="form-select"
+                      value={}
+                      required
+                    >
+                      <option value="adhhar">Adhar</option>
+                      <option value="pan">Pan</option>
+                      <option value="rent_agrreement">Rent Aggrement</option>
+                      <option value="photo">Photo</option>
+                      <option value="salary_slip">Salary Slip</option>
+                    </select>
+                  </div>
+
+                  <div className="col-12">
+                    <label className="form-label" htmlFor="paymentBeneficiary">
+                      Upload Document <span className="text-danger">*</span>
+                    </label>
+                    <input type="file" name="document_file" id="document_file"/>
+                    <div className="form-text">Upload file with size less than 1mb</div>
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary"
+                  onClick={closeSubmitDocumentModalOpen}
+                  disabled={isSubmittingDocument}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={
+                    isSubmittingDocument
+                  }
+                >
+                  {isSubmittingDocument ? "Processing…" : "Upload Document"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+      {submitDocumentModalOpen ? (
+        <div
+          className="modal-backdrop fade show"
+          role="presentation"
+          onClick={() => {
+            if (!isSubmittingDocument) {
+              closeSubmitDocumentModalOpen();
+            }
+          }}
+        />
+      ) : null}
+
     </main>
   );
 }

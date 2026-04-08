@@ -2,6 +2,7 @@ const AppError = require("../../utils/app-error");
 const { findCustomerById } = require("../customers/customers.repository");
 const { findAccountWithCustomer } = require("../accounts/accounts.repository");
 const { findLoanTypeById } = require("./loan-types.repository");
+const { insertLoanDocument } = require("./loan-documents.repository");
 const { insertLoan, findLoanById, findLoansByCustomerId } = require("./loans.repository");
 
 const toMoney2 = (value) => Math.round(Number(value) * 100) / 100;
@@ -100,11 +101,61 @@ const createLoan = async (payload) => {
   return saved;
 };
 
+
+const createLoanDocument = async (payload) => {
+  const loan = await findLoanById(payload.loan_id);
+  if (!customer) {
+    throw new AppError("Loan not found", 404);
+  }
+
+  let loanId;
+  try {
+    let lastError = null;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        loanId = await insertLoanDocument({
+          loan_id: payload.loan_id,
+          document_type: payload.document_type,
+          document_file: payload.document_file,
+          status: payload.status ?? "Pending",
+        });
+        lastError = null;
+        break;
+      } catch (err) {
+        if (err && err.code === "ER_DUP_ENTRY") {
+          lastError = err;
+          continue;
+        }
+        throw err;
+      }
+    }
+    if (!loanId && lastError) {
+      throw new AppError("Could not upload loan document", 500);
+    }
+  } catch (err) {
+    if (err && err.code === "ER_NO_SUCH_TABLE") {
+      throw new AppError("Loans document is not configured (missing tables)", 500);
+    }
+    if (err && err.code === "ER_BAD_FIELD_ERROR") {
+      throw new AppError("Database schema mismatch: run loan document migration", 500);
+    }
+    throw err;
+  }
+
+  const saved = await findLoanById(loanId);
+  if (!saved) {
+    throw new AppError("Loan document was created but could not be loaded", 500);
+  }
+  return saved;
+};
+
+
 const getLoansByCustomerId = async (customerId) => {
   return findLoansByCustomerId(customerId);
 };
 
 module.exports = {
   createLoan,
+  createLoanDocument,
   getLoansByCustomerId,
 };

@@ -6,6 +6,7 @@ const accountsRoutes = require("../../modules/accounts/accounts.routes");
 const beneficiariesRoutes = require("../../modules/beneficiaries/beneficiaries.routes");
 const transactionsRoutes = require("../../modules/transactions/transactions.routes");
 const loanTypesRoutes = require("../../modules/loans/loan-types.routes");
+const loanDocumentRoutes = require("../../modules/loans/loan-documents.routes");
 const loansRoutes = require("../../modules/loans/loans.routes");
 const authRoutes = require("../../modules/auth/auth.routes");
 
@@ -18,6 +19,7 @@ router.use("/accounts", accountsRoutes);
 router.use("/beneficiaries", beneficiariesRoutes);
 router.use("/transactions", transactionsRoutes);
 router.use("/loan-types", loanTypesRoutes);
+router.use("/loan-documents", loanDocumentRoutes);
 router.use("/loans", loansRoutes);
 router.use("/", authRoutes);
 
