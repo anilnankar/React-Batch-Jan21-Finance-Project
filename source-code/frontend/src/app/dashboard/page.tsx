@@ -164,6 +164,9 @@ export default function DashboardPage() {
   const [submitDocumentLoanId, setSubmitDocumentLoanId] = useState();
   const [submitDocumentMessage, setSubmitDocumentMessage] = useState("");
   const [isSubmittingDocument, setIsSubmittingDocument] = useState(false);
+  const [documentViewModalOpen, setDocumentViewModalOpen] = useState(false);
+  const [documentList, setDocumentList] = useState<any[]>([]);
+  const [documentViewLoanId, setDocumentViewLoanId] = useState();
   const [paymentFromAccountId, setPaymentFromAccountId] = useState("");
   const [paymentBeneficiaries, setPaymentBeneficiaries] = useState<BeneficiaryRow[]>([]);
   const [loadingPaymentBeneficiaries, setLoadingPaymentBeneficiaries] = useState(false);
@@ -310,6 +313,46 @@ export default function DashboardPage() {
     };
   }, [makePaymentModalOpen, paymentFromAccountId]);
 
+  
+  useEffect(() => {
+    if (!documentViewModalOpen) {
+      setDocumentList([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadDocuments = async () => {
+      setLoadingPaymentBeneficiaries(true);
+      try {
+        const response = await fetch(
+          `http://localhost:5000/api/v1/loan-documents/${documentViewLoanId}`
+        );
+        const result = await response.json();
+        if (cancelled) {
+          return;
+        }
+        const rows = Array.isArray(result.data) ? result.data : [];
+        setDocumentList(rows);
+      } catch {
+        if (!cancelled) {
+          setDocumentList([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingPaymentBeneficiaries(false);
+        }
+      }
+    };
+
+    void loadDocuments();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [documentViewModalOpen]);
+
+  
   useEffect(() => {
     if (!applyLoanModalOpen) {
       return;
@@ -436,6 +479,9 @@ export default function DashboardPage() {
     setSubmitDocumentModalOpen(false);
   };
  
+  const closeDocumentViewModalOpen = () => {
+    setDocumentViewModalOpen(false);
+  };
 
   const openMakePaymentModal = () => {
     setPaymentSubmitMessage("");
@@ -605,6 +651,12 @@ export default function DashboardPage() {
     setSubmitDocumentModalOpen(true);
     setSubmitDocumentLoanId(loan_id)
   };
+
+  const openDocumentLoanViewModal = (loan_id) => {
+    setDocumentViewModalOpen(true);
+    setDocumentViewLoanId(loan_id)
+  };
+  
 
   const handleApplyLoanSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -913,7 +965,7 @@ export default function DashboardPage() {
                                 </button>
                               </li>
                               <li>
-                                <button className="dropdown-item" type="button">
+                                <button className="dropdown-item" type="button" onClick={() =>openDocumentLoanViewModal(loan.loan_id)}>
                                   View Document
                                 </button>
                               </li>
@@ -1574,6 +1626,67 @@ export default function DashboardPage() {
           }}
         />
       ) : null}
+
+    <div
+        className={`modal fade${documentViewModalOpen ? " show d-block" : ""}`}
+        id="makePaymentModal"
+        tabIndex={-1}
+        role="dialog"
+        aria-modal={documentViewModalOpen}
+        aria-labelledby="submittedDocumentsViewModalLabel"
+        style={documentViewModalOpen ? undefined : { display: "none" }}
+      >
+        <div className="modal-dialog modal-dialog-scrollable">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h2 className="modal-title h5" id="submittedDocumentsViewModalLabel ">
+                View Submitted Documents for Loan
+              </h2>
+              <button
+                type="button"
+                className="btn-close"
+                aria-label="Close"
+                onClick={closeDocumentViewModalOpen}
+                disabled={isSubmittingDocument}
+              />
+            </div>
+            <div className="modal-body" style={{ maxHeight: "70vh", overflowY: "auto" }}>
+                <div className="row g-3">
+                  <div className="col-12">
+            {isLoading ? (
+              <p className="text-muted mb-0">Loading accounts…</p>
+            ) : documentList.length === 0 ? (
+              <p className="text-muted mb-0">No accounts found.</p>
+            ) : (
+              <div className="table-responsive">
+                <table className="table table-striped mb-0">
+                  <thead>
+                    <tr>
+                      <th>Document ID</th>
+                      <th>Type</th>
+                      <th>File</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {documentList.map((document) => (
+                      <tr key={document.document_id}>
+                        <td>{document.document_id}</td>
+                        <td>{document.document_type}</td>
+                        <td>{document.document_file}</td>
+                        <td>{document.status}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <div
         className={`modal fade${submitDocumentModalOpen ? " show d-block" : ""}`}

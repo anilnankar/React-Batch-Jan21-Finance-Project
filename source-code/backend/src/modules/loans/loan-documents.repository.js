@@ -21,6 +21,17 @@ const insertLoanDocument = async (row) => {
   return result.insertId;
 };
 
+const findLoanDocuments = async (loanId) => {
+  const query = `
+    SELECT document_id, loan_id, document_type, document_file, status, verified_datetime, created_datetime
+    FROM loan_documents
+    WHERE loan_id = ?
+  `;
+  const [rows] = await pool.execute(query, [loanId]);
+  return rows;
+};
+
 module.exports = {
-  insertLoanDocument
+  insertLoanDocument,
+  findLoanDocuments
 };
