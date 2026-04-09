@@ -7,7 +7,7 @@ const {
   increaseAvailableBalance,
 } = require("../accounts/accounts.repository");
 const { findBeneficiaryById } = require("../beneficiaries/beneficiaries.repository");
-const { insertTransaction, findTransactionById } = require("./transactions.repository");
+const { insertTransaction, findTransactionById, findTransactionByCustomerId } = require("./transactions.repository");
 
 const toMoneyAmount = (value) => Math.round(Number(value) * 100) / 100;
 
@@ -118,6 +118,16 @@ const createTransaction = async (payload) => {
   return saved;
 };
 
+const getTractionsactionByCustomerId = async (customerId) => {
+  const connection = await pool.getConnection();
+  try {
+    const transactions = await findTransactionByCustomerId(customerId, connection);
+    return transactions;
+  } finally {
+    connection.release();
+  }   
+};
 module.exports = {
   createTransaction,
+  getTractionsactionByCustomerId
 };

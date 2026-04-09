@@ -167,6 +167,10 @@ export default function DashboardPage() {
   const [documentViewModalOpen, setDocumentViewModalOpen] = useState(false);
   const [documentList, setDocumentList] = useState<any[]>([]);
   const [documentViewLoanId, setDocumentViewLoanId] = useState();
+
+  const [statementViewModalOpen, setStatementViewModalOpen] = useState(false);
+  const [statementList, setStatementList] = useState<any[]>([]);
+  
   const [paymentFromAccountId, setPaymentFromAccountId] = useState("");
   const [paymentBeneficiaries, setPaymentBeneficiaries] = useState<BeneficiaryRow[]>([]);
   const [loadingPaymentBeneficiaries, setLoadingPaymentBeneficiaries] = useState(false);
@@ -354,6 +358,50 @@ export default function DashboardPage() {
 
   
   useEffect(() => {
+    if (!statementViewModalOpen) {
+      setStatementList([]);
+      return;
+    }
+    const customerId = sessionStorage.getItem("customerId");
+    if (!customerId) {
+      router.replace("/login");
+      return;
+    }
+
+
+    let cancelled = false;
+
+    const loadStatements = async () => {
+      setLoadingPaymentBeneficiaries(true);
+      try {
+        const response = await fetch(
+          `http://localhost:5000/api/v1/transactions/${customerId}`
+        );
+        const result = await response.json();
+        if (cancelled) {
+          return;
+        }
+        const rows = Array.isArray(result.data) ? result.data : [];
+        setStatementList(rows);
+      } catch {
+        if (!cancelled) {
+          setStatementList([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingPaymentBeneficiaries(false);
+        }
+      }
+    };
+
+    void loadStatements();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [statementViewModalOpen]);
+
+  useEffect(() => {
     if (!applyLoanModalOpen) {
       return;
     }
@@ -482,6 +530,11 @@ export default function DashboardPage() {
   const closeDocumentViewModalOpen = () => {
     setDocumentViewModalOpen(false);
   };
+
+  const closeStatementViewModalOpen = () => {
+    setStatementViewModalOpen(false);
+  };
+  
 
   const openMakePaymentModal = () => {
     setPaymentSubmitMessage("");
@@ -656,6 +709,12 @@ export default function DashboardPage() {
     setDocumentViewModalOpen(true);
     setDocumentViewLoanId(loan_id)
   };
+
+  
+  const openStatementLoanViewModal = () => {
+    setStatementViewModalOpen(true);
+  };
+  
   
 
   const handleApplyLoanSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -805,7 +864,7 @@ export default function DashboardPage() {
                 </button>
               </li>
               <li>
-                <button className="dropdown-item" type="button">
+                <button className="dropdown-item" type="button" onClick={openStatementLoanViewModal}>
                   Statements
                 </button>
               </li>
@@ -1656,7 +1715,7 @@ export default function DashboardPage() {
             {isLoading ? (
               <p className="text-muted mb-0">Loading accounts…</p>
             ) : documentList.length === 0 ? (
-              <p className="text-muted mb-0">No accounts found.</p>
+              <p className="text-muted mb-0">No documents found.</p>
             ) : (
               <div className="table-responsive">
                 <table className="table table-striped mb-0">
@@ -1675,6 +1734,70 @@ export default function DashboardPage() {
                         <td>{document.document_type}</td>
                         <td>{document.document_file}</td>
                         <td>{document.status}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+        className={`modal fade${statementViewModalOpen ? " show d-block" : ""}`}
+        id="makePaymentModal"
+        tabIndex={-1}
+        role="dialog"
+        aria-modal={statementViewModalOpen}
+        aria-labelledby="submittedDocumentsViewModalLabel"
+        style={statementViewModalOpen ? undefined : { display: "none" }}
+      >
+        <div className="modal-dialog modal-dialog-scrollable">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h2 className="modal-title h5" id="submittedDocumentsViewModalLabel ">
+                Account Statements
+              </h2>
+              <button
+                type="button"
+                className="btn-close"
+                aria-label="Close"
+                onClick={closeStatementViewModalOpen}
+              />
+            </div>
+            <div className="modal-body" style={{ maxHeight: "70vh", overflowY: "auto" }}>
+                <div className="row g-3">
+                  <div className="col-12">
+            {isLoading ? (
+              <p className="text-muted mb-0">Loading accounts…</p>
+            ) : statementList.length === 0 ? (
+              <p className="text-muted mb-0">No statements found.</p>
+            ) : (
+              <div className="table-responsive">
+                <table className="table table-striped mb-0">
+                  <thead>
+                    <tr>
+                      <th>Transction ID</th>
+                      <th>Amount</th>
+                      <th>Type</th>
+                      <th>Beneficiary Name</th>
+                      <th>Status</th>
+                      <th>Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {statementList.map((statement) => (
+                      <tr key={statement.transaction_id}>
+                        <td>{statement.transaction_id}</td>
+                        <td>{statement.amount}</td>
+                        <td>{statement.transaction_type}</td>
+                        <td>{statement.beneficiary_name}</td>
+                        <td>{statement.status}</td>
+                        <td>{statement.created_at}</td>
                       </tr>
                     ))}
                   </tbody>

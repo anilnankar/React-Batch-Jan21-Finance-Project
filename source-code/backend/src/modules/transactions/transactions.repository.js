@@ -55,7 +55,49 @@ const findTransactionById = async (transactionId) => {
   return rows[0] || null;
 };
 
+const findTransactionByCustomerId = async (customerId, connection = null) => {
+  const executor = connection || pool;
+
+  const query1 = `
+    SELECT
+      account_id,
+      account_number,
+      customer_id
+    FROM accounts
+    WHERE customer_id = ?
+    ORDER BY created_at DESC  
+  `;
+  const [accountRow] = await executor.execute(query1, [customerId]);
+
+  const query = `
+    SELECT
+      t.transaction_id,
+      t.customer_id,
+      t.from_account_id,
+      t.beneficiary_id,
+      t.amount,
+      t.currency_code,
+      t.transaction_type,
+      t.status,
+      t.payment_channel,  
+      t.remarks,
+      t.created_at,
+      t.updated_at,
+      b.beneficiary_name,
+      b.beneficiary_account_number
+    FROM transactions as t
+    LEFT JOIN beneficiaries as b ON t.beneficiary_id = b.beneficiary_id   
+    WHERE 
+    (t.from_account_id = ? OR t.beneficiary_id = ?)
+    ORDER BY created_at DESC  
+  `;
+  // console.log("Executing query to find transactions for account_id:", accountRow[0].account_id);
+  const [rows] = await executor.execute(query, [accountRow[0].account_id, accountRow[0].account_id]);
+  return rows;
+};
+
 module.exports = {
   insertTransaction,
   findTransactionById,
+  findTransactionByCustomerId
 };
