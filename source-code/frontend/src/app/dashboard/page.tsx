@@ -1,154 +1,20 @@
-"use client";
+ "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-
-type AccountRow = {
-  account_id: number;
-  account_number: string;
-  customer_id: number;
-  account_type: string;
-  currency_code: string;
-  status: string;
-  available_balance: string;
-  ledger_balance: string;
-};
-
-type BeneficiaryRow = {
-  beneficiary_id: number;
-  account_id: number;
-  beneficiary_name: string;
-  beneficiary_account_number: string;
-  ifsc_code: string | null;
-  bank_name: string | null;
-  nickname: string | null;
-  status: string;
-};
-
-type CustomerRow = {
-  customer_id: number;
-  customer_code: string;
-  customer_type: string;
-  full_name: string;
-  date_of_birth_or_incorp: string | null;
-  mobile_number: string;
-  email: string | null;
-  pan_number: string;
-  kyc_status: string;
-  risk_category: string;
-  status: string;
-  created_at?: string;
-  updated_at?: string;
-};
-
-type LoanTypeRow = {
-  loan_type_id: number;
-  loan_type: "Personal" | "Home" | "Gold" | "Property" | "Car";
-  roi: number;
-  min_tenure: number;
-  max_tenure: number;
-  status: "ACTIVE" | "INACTIVE";
-  created_date?: string;
-  updated_date?: string;
-};
-
-type LoanRow = {
-  loan_id: number;
-  loan_account_number: string;
-  loan_type_id: number;
-  loan_type: string | null;
-  product_roi: string | number | null;
-  customer_id: number;
-  linked_account_id: number | null;
-  linked_account_number: string | null;
-  principal_amount: string;
-  disbursed_amount: string;
-  interest_rate_annual: string;
-  tenure_months: number;
-  start_date: string | null;
-  end_date: string | null;
-  loan_status: "APPLIED" | "APPROVED" | "DISBURSED" | "ACTIVE" | "CLOSED" | "NPA" | "WRITTEN_OFF";
-  created_at: string;
-  updated_at: string;
-};
-
-function formatEnumLabel(value: string) {
-  return value
-    .split("_")
-    .map((word) => word.charAt(0) + word.slice(1).toLowerCase())
-    .join(" ");
-}
-
-function formatDate(value: string | null) {
-  if (!value) {
-    return "—";
-  }
-  const [y, m, d] = value.split("-").map(Number);
-  if (!y || !m || !d) {
-    return value;
-  }
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  }).format(new Date(y, m - 1, d));
-}
-
-function kycStatusClass(status: string) {
-  if (status === "VERIFIED") {
-    return "text-success";
-  }
-  if (status === "PENDING") {
-    return "text-warning";
-  }
-  if (status === "REJECTED" || status === "EXPIRED") {
-    return "text-danger";
-  }
-  return "text-muted";
-}
-
-function formatMoney(amount: string | number, currencyCode: string) {
-  const n = typeof amount === "string" ? Number.parseFloat(amount) : amount;
-  if (Number.isNaN(n)) {
-    return "—";
-  }
-  try {
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: currencyCode || "INR",
-      maximumFractionDigits: 2,
-    }).format(n);
-  } catch {
-    return `${currencyCode || "INR"} ${n}`;
-  }
-}
-
-function loanStatusBadgeClass(status: LoanRow["loan_status"]) {
-  if (status === "ACTIVE" || status === "DISBURSED" || status === "APPROVED") {
-    return "text-bg-success";
-  }
-  if (status === "APPLIED") {
-    return "text-bg-info";
-  }
-  if (status === "NPA" || status === "WRITTEN_OFF") {
-    return "text-bg-danger";
-  }
-  return "text-bg-secondary";
-}
-
-/** ISO date `YYYY-MM-DD` plus whole calendar months (loan tenure). */
-function addMonthsToIsoDate(isoDate: string, months: number): string {
-  const [y, m, d] = isoDate.split("-").map(Number);
-  if (!y || !m || !d || !Number.isFinite(months)) {
-    return "";
-  }
-  const dt = new Date(y, m - 1 + months, d);
-  const yy = dt.getFullYear();
-  const mm = String(dt.getMonth() + 1).padStart(2, "0");
-  const dd = String(dt.getDate()).padStart(2, "0");
-  return `${yy}-${mm}-${dd}`;
-}
+import { AccountsCard } from "./components/AccountsCard";
+import { AddPayeeModal } from "./components/AddPayeeModal";
+import { ApplyLoanModal } from "./components/ApplyLoanModal";
+import { CustomerInfoCard } from "./components/CustomerInfoCard";
+import { DashboardHeader } from "./components/DashboardHeader";
+import { DocumentViewModal } from "./components/DocumentViewModal";
+import { LoansCard } from "./components/LoansCard";
+import { MakePaymentModal } from "./components/MakePaymentModal";
+import { StatementViewModal } from "./components/StatementViewModal";
+import { SubmitDocumentModal } from "./components/SubmitDocumentModal";
+import { SummaryCards } from "./components/SummaryCards";
+import type { AccountRow, BeneficiaryRow, CustomerRow, LoanDocumentRow, LoanRow, LoanTypeRow, StatementRow } from "./types";
+import { addMonthsToIsoDate } from "./utils";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -161,15 +27,15 @@ export default function DashboardPage() {
   const [isSubmittingPayee, setIsSubmittingPayee] = useState(false);
   const [makePaymentModalOpen, setMakePaymentModalOpen] = useState(false);
   const [submitDocumentModalOpen, setSubmitDocumentModalOpen] = useState(false);
-  const [submitDocumentLoanId, setSubmitDocumentLoanId] = useState();
+  const [submitDocumentLoanId, setSubmitDocumentLoanId] = useState<number | null>(null);
   const [submitDocumentMessage, setSubmitDocumentMessage] = useState("");
   const [isSubmittingDocument, setIsSubmittingDocument] = useState(false);
   const [documentViewModalOpen, setDocumentViewModalOpen] = useState(false);
-  const [documentList, setDocumentList] = useState<any[]>([]);
-  const [documentViewLoanId, setDocumentViewLoanId] = useState();
+  const [documentList, setDocumentList] = useState<LoanDocumentRow[]>([]);
+  const [documentViewLoanId, setDocumentViewLoanId] = useState<number | null>(null);
 
   const [statementViewModalOpen, setStatementViewModalOpen] = useState(false);
-  const [statementList, setStatementList] = useState<any[]>([]);
+  const [statementList, setStatementList] = useState<StatementRow[]>([]);
   
   const [paymentFromAccountId, setPaymentFromAccountId] = useState("");
   const [paymentBeneficiaries, setPaymentBeneficiaries] = useState<BeneficiaryRow[]>([]);
@@ -354,7 +220,7 @@ export default function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [documentViewModalOpen]);
+  }, [documentViewModalOpen, documentViewLoanId]);
 
   
   useEffect(() => {
@@ -399,7 +265,7 @@ export default function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [statementViewModalOpen]);
+  }, [statementViewModalOpen, router]);
 
   useEffect(() => {
     if (!applyLoanModalOpen) {
@@ -525,10 +391,14 @@ export default function DashboardPage() {
   
   const closeSubmitDocumentModalOpen = () => {
     setSubmitDocumentModalOpen(false);
+    setSubmitDocumentMessage("");
+    setSubmitDocumentLoanId(null);
   };
  
   const closeDocumentViewModalOpen = () => {
     setDocumentViewModalOpen(false);
+    setDocumentList([]);
+    setDocumentViewLoanId(null);
   };
 
   const closeStatementViewModalOpen = () => {
@@ -700,14 +570,14 @@ export default function DashboardPage() {
   };
 
   
-  const openSubmitDocumentLoanModal = (loan_id) => {
+  const openSubmitDocumentLoanModal = (loan_id: number) => {
     setSubmitDocumentModalOpen(true);
-    setSubmitDocumentLoanId(loan_id)
+    setSubmitDocumentLoanId(loan_id);
   };
 
-  const openDocumentLoanViewModal = (loan_id) => {
+  const openDocumentLoanViewModal = (loan_id: number) => {
     setDocumentViewModalOpen(true);
-    setDocumentViewLoanId(loan_id)
+    setDocumentViewLoanId(loan_id);
   };
 
   
@@ -805,144 +675,19 @@ export default function DashboardPage() {
 
   return (
     <main className="container py-4 py-md-5">
-      <div className="d-flex justify-content-between align-items-start align-items-md-center flex-wrap gap-3 mb-4">
-        <div>
-          <h1 className="h3 mb-1">Customer Dashboard</h1>
-          <p className="text-muted mb-0">
-            {isLoading
-              ? "Loading your profile…"
-              : customer
-                ? `Welcome back, ${customer.full_name}. Here is your latest financial overview.`
-                : "Here is your latest financial overview."}
-          </p>
-        </div>
+      <DashboardHeader
+        isLoading={isLoading}
+        customer={customer}
+        onOpenAddPayee={() => {
+          setPayeeSubmitMessage("");
+          setAddPayeeModalOpen(true);
+        }}
+        onOpenPayment={openMakePaymentModal}
+        onOpenStatements={openStatementLoanViewModal}
+        onOpenApplyLoan={openApplyLoanModal}
+      />
 
-        <div className="d-flex flex-wrap align-items-center gap-2 ms-md-auto">
-          <div className="dropdown">
-            <button
-              className="btn btn-outline-primary dropdown-toggle"
-              type="button"
-              data-bs-toggle="dropdown"
-              aria-expanded="false"
-            >
-              Manage Payee
-            </button>
-            <ul className="dropdown-menu dropdown-menu-end">
-              <li>
-                <button
-                  className="dropdown-item"
-                  type="button"
-                  onClick={() => {
-                    setPayeeSubmitMessage("");
-                    setAddPayeeModalOpen(true);
-                  }}
-                >
-                  Add Payee
-                </button>
-              </li>
-              <li>
-                <button className="dropdown-item" type="button">
-                  Remove Payee
-                </button>
-              </li>
-            </ul>
-          </div>
-
-          <div className="dropdown">
-            <button
-              className="btn btn-outline-primary dropdown-toggle"
-              type="button"
-              data-bs-toggle="dropdown"
-              aria-expanded="false"
-            >
-              Transactions
-            </button>
-            <ul className="dropdown-menu dropdown-menu-end">
-              <li>
-                <button className="dropdown-item" type="button" onClick={openMakePaymentModal}>
-                  Make Payment
-                </button>
-              </li>
-              <li>
-                <button className="dropdown-item" type="button" onClick={openStatementLoanViewModal}>
-                  Statements
-                </button>
-              </li>
-            </ul>
-          </div>
-
-          <div className="dropdown">
-            <button
-              className="btn btn-outline-primary dropdown-toggle"
-              type="button"
-              data-bs-toggle="dropdown"
-              aria-expanded="false"
-            >
-              Loans
-            </button>
-            <ul className="dropdown-menu dropdown-menu-end">
-              <li>
-                <button className="dropdown-item" type="button" onClick={openApplyLoanModal}>
-                  Apply Loan
-                </button>
-              </li>
-              <li>
-                <button className="dropdown-item" type="button">
-                  Foreclose Request
-                </button>
-              </li>
-              <li>
-                <button className="dropdown-item" type="button">
-                  Statement
-                </button>
-              </li>
-            </ul>
-          </div>
-
-          <Link
-            href="/login"
-            className="btn btn-outline-secondary"
-            onClick={() => sessionStorage.removeItem("customerId")}
-          >
-            Logout
-          </Link>
-        </div>
-      </div>
-
-      <div className="row g-3 mb-4">
-        <div className="col-12 col-md-4">
-          <div className="card h-100 border-2">
-            <div className="card-body">
-              <p className="text-muted mb-1">Total Accounts</p>
-              <h2 className="h4 mb-0">{isLoading ? "…" : accounts.length}</h2>
-            </div>
-          </div>
-        </div>
-        <div className="col-12 col-md-4">
-          <div className="card h-100 border-2">
-            <div className="card-body">
-              <p className="text-muted mb-1">Active Loans</p>
-              <h2 className="h4 mb-0">
-                {isLoading
-                  ? "…"
-                  : customerLoans.filter((loan) =>
-                      ["ACTIVE", "APPROVED", "DISBURSED"].includes(loan.loan_status)
-                    ).length}
-              </h2>
-            </div>
-          </div>
-        </div>
-        <div className="col-12 col-md-4">
-          <div className="card h-100 border-2">
-            <div className="card-body">
-              <p className="text-muted mb-1">KYC Status</p>
-              <h2 className={`h4 mb-0 ${customer ? kycStatusClass(customer.kyc_status) : "text-muted"}`}>
-                {isLoading ? "…" : customer ? formatEnumLabel(customer.kyc_status) : "—"}
-              </h2>
-            </div>
-          </div>
-        </div>
-      </div>
+      <SummaryCards isLoading={isLoading} accountsCount={accounts.length} customerLoans={customerLoans} customer={customer} />
 
       {loadError ? (
         <div className="alert alert-warning" role="alert">
@@ -952,953 +697,85 @@ export default function DashboardPage() {
 
       <div className="row g-4">
         <div className="col-12 col-lg-7">
-          <div className="card border-2 h-100">
-            <div className="card-body">
-              <h2 className="h5 mb-3">Accounts</h2>
-              {isLoading ? (
-                <p className="text-muted mb-0">Loading accounts…</p>
-              ) : accounts.length === 0 ? (
-                <p className="text-muted mb-0">No accounts found.</p>
-              ) : (
-                <div className="table-responsive">
-                  <table className="table table-striped mb-0">
-                    <thead>
-                      <tr>
-                        <th>Account No</th>
-                        <th>Type</th>
-                        <th>Available balance</th>
-                        <th>Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {accounts.map((account) => (
-                        <tr key={account.account_id}>
-                          <td>{account.account_number}</td>
-                          <td>{formatEnumLabel(account.account_type)}</td>
-                          <td>{formatMoney(account.available_balance, account.currency_code)}</td>
-                          <td>{account.status}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </div>
+          <AccountsCard isLoading={isLoading} accounts={accounts} />
         </div>
-
         <div className="col-12 col-lg-5">
-          <div className="card border-2 h-100">
-            <div className="card-body">
-              <h2 className="h5 mb-3">Loan Details</h2>
-              <div className="d-grid gap-3">
-                {isLoading ? (
-                  <p className="text-muted mb-0">Loading loans…</p>
-                ) : customerLoans.length === 0 ? (
-                  <p className="text-muted mb-0">No loans found for this customer.</p>
-                ) : (
-                  customerLoans.map((loan) => {
-                    const principal = Number.parseFloat(loan.principal_amount || "0");
-                    const disbursed = Number.parseFloat(loan.disbursed_amount || "0");
-                    const outstanding = Number.isFinite(principal - disbursed) ? principal - disbursed : principal;
-                    return (
-                      <div className="border rounded p-3" key={loan.loan_id}>
-                        <div className="d-flex justify-content-between mb-1">
-                          <strong>{loan.loan_type || "Loan"}</strong>
-                          <span className={`badge ${loanStatusBadgeClass(loan.loan_status)}`}>
-                            {formatEnumLabel(loan.loan_status)}
-                          </span>
-                          <div className="dropdown">
-                            <button
-                              className="btn btn-outline-primary dropdown-toggle"
-                              type="button"
-                              data-bs-toggle="dropdown"
-                              aria-expanded="false"
-                            >
-                              Actions
-                            </button>
-                            <ul className="dropdown-menu dropdown-menu-end">
-                              <li>
-                                <button className="dropdown-item" type="button" onClick={() =>openSubmitDocumentLoanModal(loan.loan_id)}>
-                                  Submit Document
-                                </button>
-                              </li>
-                              <li>
-                                <button className="dropdown-item" type="button" onClick={() =>openDocumentLoanViewModal(loan.loan_id)}>
-                                  View Document
-                                </button>
-                              </li>
-                              <li>
-                                <button className="dropdown-item" type="button">
-                                  Cancel Loan
-                                </button>
-                              </li>
-                            </ul>
-                          </div>
-
-                        </div>
-                        <div className="small text-muted">{loan.loan_account_number}</div>
-                        <div className="mt-2">
-                          Principal: {formatMoney(loan.principal_amount, "INR")}
-                        </div>
-                        <div>Outstanding: {formatMoney(outstanding, "INR")}</div>
-                        <div>Rate: {loan.interest_rate_annual}% p.a.</div>
-                        <div>Tenure: {loan.tenure_months} months</div>
-                        <div>
-                          Period: {formatDate(loan.start_date)} to {formatDate(loan.end_date)}
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          </div>
+          <LoansCard
+            isLoading={isLoading}
+            customerLoans={customerLoans}
+            onOpenSubmitDocument={openSubmitDocumentLoanModal}
+            onOpenViewDocument={openDocumentLoanViewModal}
+          />
         </div>
       </div>
 
-      <div className="card border-2 mt-4">
-        <div className="card-body">
-          <h2 className="h5 mb-3">Customer Information</h2>
-          {isLoading ? (
-            <p className="text-muted mb-0">Loading customer details…</p>
-          ) : !customer ? (
-            <p className="text-muted mb-0">Customer profile could not be loaded.</p>
-          ) : (
-            <div className="row g-3">
-              <div className="col-12 col-md-6 col-lg-4">
-                <p className="mb-1 text-muted">Full name</p>
-                <p className="mb-0 fw-semibold">{customer.full_name}</p>
-              </div>
-              <div className="col-12 col-md-6 col-lg-4">
-                <p className="mb-1 text-muted">Customer code</p>
-                <p className="mb-0 fw-semibold">{customer.customer_code}</p>
-              </div>
-              <div className="col-12 col-md-6 col-lg-4">
-                <p className="mb-1 text-muted">Customer type</p>
-                <p className="mb-0 fw-semibold">{formatEnumLabel(customer.customer_type)}</p>
-              </div>
-              <div className="col-12 col-md-6 col-lg-4">
-                <p className="mb-1 text-muted">Email</p>
-                <p className="mb-0 fw-semibold">{customer.email || "—"}</p>
-              </div>
-              <div className="col-12 col-md-6 col-lg-4">
-                <p className="mb-1 text-muted">Mobile number</p>
-                <p className="mb-0 fw-semibold">{customer.mobile_number}</p>
-              </div>
-              <div className="col-12 col-md-6 col-lg-4">
-                <p className="mb-1 text-muted">PAN</p>
-                <p className="mb-0 fw-semibold text-uppercase">{customer.pan_number}</p>
-              </div>
-              <div className="col-12 col-md-6 col-lg-4">
-                <p className="mb-1 text-muted">Date of birth / incorporation</p>
-                <p className="mb-0 fw-semibold">{formatDate(customer.date_of_birth_or_incorp)}</p>
-              </div>
-              <div className="col-12 col-md-6 col-lg-4">
-                <p className="mb-1 text-muted">Account status</p>
-                <p className="mb-0 fw-semibold">{formatEnumLabel(customer.status)}</p>
-              </div>
-              <div className="col-12 col-md-6 col-lg-4">
-                <p className="mb-1 text-muted">Risk category</p>
-                <p className="mb-0 fw-semibold">{formatEnumLabel(customer.risk_category)}</p>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+      <CustomerInfoCard isLoading={isLoading} customer={customer} />
 
-      <div
-        className={`modal fade${addPayeeModalOpen ? " show d-block" : ""}`}
-        id="addPayeeModal"
-        tabIndex={-1}
-        role="dialog"
-        aria-modal={addPayeeModalOpen}
-        aria-labelledby="addPayeeModalLabel"
-        style={addPayeeModalOpen ? undefined : { display: "none" }}
-      >
-        <div className="modal-dialog modal-dialog-scrollable">
-          <div className="modal-content">
-            <div className="modal-header">
-              <h2 className="modal-title h5" id="addPayeeModalLabel">
-                Add Payee
-              </h2>
-              <button
-                type="button"
-                className="btn-close"
-                aria-label="Close"
-                onClick={closeAddPayeeModal}
-                disabled={isSubmittingPayee}
-              />
-            </div>
-            <form onSubmit={handleAddPayeeSubmit}>
-              <div className="modal-body" style={{ maxHeight: "70vh", overflowY: "auto" }}>
-                <div className="row g-3">
-                  <div className="col-12">
-                    <label className="form-label" htmlFor="payeeAccountId">
-                      Your account <span className="text-danger">*</span>
-                    </label>
-                    <select
-                      id="payeeAccountId"
-                      name="account_id"
-                      className="form-select"
-                      defaultValue=""
-                      required
-                      disabled={accounts.length === 0}
-                    >
-                      <option value="" disabled>
-                        {accounts.length === 0 ? "No accounts available" : "Select account"}
-                      </option>
-                      {accounts.map((acc) => (
-                        <option key={acc.account_id} value={acc.account_id}>
-                          {acc.account_number} · {formatEnumLabel(acc.account_type)}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="col-12">
-                    <label className="form-label" htmlFor="beneficiaryName">
-                      Beneficiary name <span className="text-danger">*</span>
-                    </label>
-                    <input
-                      id="beneficiaryName"
-                      name="beneficiary_name"
-                      type="text"
-                      className="form-control"
-                      placeholder="Full name as per bank"
-                      minLength={2}
-                      maxLength={150}
-                      required
-                    />
-                  </div>
-                  <div className="col-12">
-                    <label className="form-label" htmlFor="beneficiaryAccountNumber">
-                      Beneficiary account number <span className="text-danger">*</span>
-                    </label>
-                    <input
-                      id="beneficiaryAccountNumber"
-                      name="beneficiary_account_number"
-                      type="text"
-                      className="form-control"
-                      placeholder="Account / IBAN"
-                      minLength={5}
-                      maxLength={32}
-                      required
-                    />
-                  </div>
-                  <div className="col-12 col-md-6">
-                    <label className="form-label" htmlFor="ifscCode">
-                      IFSC code
-                    </label>
-                    <input
-                      id="ifscCode"
-                      name="ifsc_code"
-                      type="text"
-                      className="form-control text-uppercase"
-                      placeholder="e.g. HDFC0001234"
-                      maxLength={11}
-                      pattern="^[A-Z]{4}0[A-Z0-9]{6}$"
-                    />
-                    <div className="form-text">11 characters. Leave blank if not applicable.</div>
-                  </div>
-                  <div className="col-12 col-md-6">
-                    <label className="form-label" htmlFor="bankName">
-                      Bank name
-                    </label>
-                    <input
-                      id="bankName"
-                      name="bank_name"
-                      type="text"
-                      className="form-control"
-                      placeholder="Beneficiary bank"
-                      maxLength={150}
-                    />
-                  </div>
-                  <div className="col-12 col-md-6">
-                    <label className="form-label" htmlFor="nickname">
-                      Nickname
-                    </label>
-                    <input
-                      id="nickname"
-                      name="nickname"
-                      type="text"
-                      className="form-control"
-                      placeholder="Short label for this payee"
-                      maxLength={80}
-                    />
-                  </div>
-                  <div className="col-12 col-md-6">
-                    <label className="form-label" htmlFor="beneficiaryStatus">
-                      Status
-                    </label>
-                    <select id="beneficiaryStatus" name="status" className="form-select" defaultValue="ACTIVE">
-                      <option value="ACTIVE">Active</option>
-                      <option value="INACTIVE">Inactive</option>
-                      <option value="PENDING">Pending</option>
-                    </select>
-                  </div>
-                </div>
-                {payeeSubmitMessage ? (
-                  <div className="alert alert-danger mt-3 mb-0 py-2" role="alert">
-                    {payeeSubmitMessage}
-                  </div>
-                ) : null}
-              </div>
-              <div className="modal-footer">
-                <button
-                  type="button"
-                  className="btn btn-outline-secondary"
-                  onClick={closeAddPayeeModal}
-                  disabled={isSubmittingPayee}
-                >
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary" disabled={isSubmittingPayee || accounts.length === 0}>
-                  {isSubmittingPayee ? "Saving…" : "Save payee"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </div>
-      {addPayeeModalOpen ? (
-        <div
-          className="modal-backdrop fade show"
-          role="presentation"
-          onClick={() => {
-            if (!isSubmittingPayee) {
-              closeAddPayeeModal();
-            }
-          }}
-        />
-      ) : null}
+      <AddPayeeModal
+        open={addPayeeModalOpen}
+        accounts={accounts}
+        message={payeeSubmitMessage}
+        isSubmitting={isSubmittingPayee}
+        onClose={closeAddPayeeModal}
+        onSubmit={handleAddPayeeSubmit}
+      />
 
-      <div
-        className={`modal fade${makePaymentModalOpen ? " show d-block" : ""}`}
-        id="makePaymentModal"
-        tabIndex={-1}
-        role="dialog"
-        aria-modal={makePaymentModalOpen}
-        aria-labelledby="makePaymentModalLabel"
-        style={makePaymentModalOpen ? undefined : { display: "none" }}
-      >
-        <div className="modal-dialog modal-dialog-scrollable">
-          <div className="modal-content">
-            <div className="modal-header">
-              <h2 className="modal-title h5" id="makePaymentModalLabel">
-                Make payment
-              </h2>
-              <button
-                type="button"
-                className="btn-close"
-                aria-label="Close"
-                onClick={closeMakePaymentModal}
-                disabled={isSubmittingPayment}
-              />
-            </div>
-            <form onSubmit={handleMakePaymentSubmit}>
-              <div className="modal-body" style={{ maxHeight: "70vh", overflowY: "auto" }}>
-                <div className="row g-3">
-                  <div className="col-12">
-                    <label className="form-label" htmlFor="paymentFromAccount">
-                      From account <span className="text-danger">*</span>
-                    </label>
-                    <select
-                      id="paymentFromAccount"
-                      name="from_account_id"
-                      className="form-select"
-                      value={paymentFromAccountId}
-                      onChange={(e) => setPaymentFromAccountId(e.target.value)}
-                      required
-                      disabled={accounts.length === 0}
-                    >
-                      <option value="" disabled>
-                        {accounts.length === 0 ? "No accounts available" : "Select your account"}
-                      </option>
-                      {accounts.map((acc) => (
-                        <option key={acc.account_id} value={String(acc.account_id)}>
-                          {acc.account_number} · {formatEnumLabel(acc.account_type)} ·{" "}
-                          {formatMoney(acc.available_balance, acc.currency_code)}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="form-text">Debit this account for the transfer.</div>
-                  </div>
+      <MakePaymentModal
+        open={makePaymentModalOpen}
+        accounts={accounts}
+        paymentFromAccountId={paymentFromAccountId}
+        paymentBeneficiaries={paymentBeneficiaries}
+        loadingPaymentBeneficiaries={loadingPaymentBeneficiaries}
+        message={paymentSubmitMessage}
+        isSubmitting={isSubmittingPayment}
+        onClose={closeMakePaymentModal}
+        onSubmit={handleMakePaymentSubmit}
+        onPaymentFromAccountChange={setPaymentFromAccountId}
+      />
 
-                  <div className="col-12">
-                    <label className="form-label" htmlFor="paymentBeneficiary">
-                      To account (payee) <span className="text-danger">*</span>
-                    </label>
-                    <select
-                      id="paymentBeneficiary"
-                      key={paymentFromAccountId || "no-from"}
-                      name="beneficiary_id"
-                      className="form-select"
-                      defaultValue=""
-                      required
-                      disabled={!paymentFromAccountId || loadingPaymentBeneficiaries || accounts.length === 0}
-                    >
-                      <option value="" disabled>
-                        {!paymentFromAccountId
-                          ? "Select from account first"
-                          : loadingPaymentBeneficiaries
-                            ? "Loading payees…"
-                            : paymentBeneficiaries.length === 0
-                              ? "No active payees for this account"
-                              : "Select payee"}
-                      </option>
-                      {paymentBeneficiaries.map((b) => (
-                        <option key={b.beneficiary_id} value={b.beneficiary_id}>
-                          {b.beneficiary_name} — {b.beneficiary_account_number}
-                          {b.nickname ? ` (${b.nickname})` : ""}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="form-text">Active payees linked to the selected account.</div>
-                  </div>
+      <ApplyLoanModal
+        open={applyLoanModalOpen}
+        loanTypesLoadError={loanTypesLoadError}
+        loadingLoanTypes={loadingLoanTypes}
+        loanTypes={loanTypes}
+        selectedTypeId={applyLoanSelectedTypeId}
+        selectedTypeMeta={selectedApplyLoanTypeMeta}
+        applyLoanTenureStr={applyLoanTenureStr}
+        applyLoanStartDate={applyLoanStartDate}
+        applyLoanComputedEndDate={applyLoanComputedEndDate}
+        message={applyLoanSubmitMessage}
+        isSubmitting={isSubmittingLoan}
+        accounts={accounts}
+        onClose={closeApplyLoanModal}
+        onSubmit={handleApplyLoanSubmit}
+        onTypeChange={(nextId) => {
+          setApplyLoanSelectedTypeId(nextId);
+          const lt = loanTypes.find((x) => String(x.loan_type_id) === nextId);
+          if (lt) {
+            setApplyLoanTenureStr(String(lt.min_tenure));
+          }
+        }}
+        onTenureChange={setApplyLoanTenureStr}
+        onStartDateChange={setApplyLoanStartDate}
+      />
 
-                  <div className="col-12 col-md-6">
-                    <label className="form-label" htmlFor="paymentAmountInr">
-                      Amount (INR) <span className="text-danger">*</span>
-                    </label>
-                    <input
-                      id="paymentAmountInr"
-                      name="amount_in_inr"
-                      type="number"
-                      inputMode="decimal"
-                      className="form-control"
-                      placeholder="0.00"
-                      min={0.01}
-                      step={0.01}
-                      required
-                    />
-                    <div className="form-text">Numbers only; paise up to two decimal places.</div>
-                  </div>
+      <DocumentViewModal
+        open={documentViewModalOpen}
+        isLoading={isLoading}
+        isSubmittingDocument={isSubmittingDocument}
+        documents={documentList}
+        onClose={closeDocumentViewModalOpen}
+      />
 
-                  <div className="col-12 col-md-6">
-                    <label className="form-label" htmlFor="paymentChannel">
-                      Payment channel
-                    </label>
-                    <select id="paymentChannel" name="payment_channel" className="form-select" defaultValue="NETBANKING">
-                      <option value="NETBANKING">Net banking</option>
-                      <option value="MOBILE">Mobile</option>
-                      <option value="BRANCH">Branch</option>
-                    </select>
-                  </div>
+      <StatementViewModal open={statementViewModalOpen} isLoading={isLoading} statements={statementList} onClose={closeStatementViewModalOpen} />
 
-                  <div className="col-12">
-                    <label className="form-label" htmlFor="paymentRemarks">
-                      Remarks (optional)
-                    </label>
-                    <textarea
-                      id="paymentRemarks"
-                      name="remarks"
-                      className="form-control"
-                      rows={2}
-                      maxLength={255}
-                      placeholder="Note for your records"
-                    />
-                  </div>
-                </div>
-                {paymentSubmitMessage ? (
-                  <div className="alert alert-danger mt-3 mb-0 py-2" role="alert">
-                    {paymentSubmitMessage}
-                  </div>
-                ) : null}
-              </div>
-              <div className="modal-footer">
-                <button
-                  type="button"
-                  className="btn btn-outline-secondary"
-                  onClick={closeMakePaymentModal}
-                  disabled={isSubmittingPayment}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={
-                    isSubmittingPayment || accounts.length === 0 || !paymentFromAccountId || paymentBeneficiaries.length === 0
-                  }
-                >
-                  {isSubmittingPayment ? "Processing…" : "Pay now"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </div>
-      {makePaymentModalOpen ? (
-        <div
-          className="modal-backdrop fade show"
-          role="presentation"
-          onClick={() => {
-            if (!isSubmittingPayment) {
-              closeMakePaymentModal();
-            }
-          }}
-        />
-      ) : null}
-
-      <div
-        className={`modal fade${applyLoanModalOpen ? " show d-block" : ""}`}
-        id="applyLoanModal"
-        tabIndex={-1}
-        role="dialog"
-        aria-modal={applyLoanModalOpen}
-        aria-labelledby="applyLoanModalLabel"
-        style={applyLoanModalOpen ? undefined : { display: "none" }}
-      >
-        <div className="modal-dialog modal-dialog-scrollable modal-lg">
-          <div className="modal-content">
-            <div className="modal-header">
-              <h2 className="modal-title h5" id="applyLoanModalLabel">
-                Apply for loan
-              </h2>
-              <button
-                type="button"
-                className="btn-close"
-                aria-label="Close"
-                onClick={closeApplyLoanModal}
-                disabled={isSubmittingLoan}
-              />
-            </div>
-            <form key={applyLoanModalOpen ? "apply-loan-open" : "apply-loan-closed"} onSubmit={handleApplyLoanSubmit}>
-              <div className="modal-body" style={{ maxHeight: "70vh", overflowY: "auto" }}>
-                {loanTypesLoadError ? (
-                  <div className="alert alert-warning py-2" role="alert">
-                    {loanTypesLoadError}
-                  </div>
-                ) : null}
-                <div className="alert alert-info py-2 mb-3" role="alert">
-                  Loan account number is auto-generated when you submit the application.
-                </div>
-                <div className="row g-3">
-                  <div className="col-12 col-md-6">
-                    <label className="form-label" htmlFor="loanTypeId">
-                      Loan type <span className="text-danger">*</span>
-                    </label>
-                    <select
-                      id="loanTypeId"
-                      name="loan_type_id"
-                      className="form-select"
-                      value={applyLoanSelectedTypeId}
-                      onChange={(e) => {
-                        const nextId = e.target.value;
-                        setApplyLoanSelectedTypeId(nextId);
-                        const lt = loanTypes.find((x) => String(x.loan_type_id) === nextId);
-                        if (lt) {
-                          setApplyLoanTenureStr(String(lt.min_tenure));
-                        }
-                      }}
-                      required
-                      disabled={isSubmittingLoan || loadingLoanTypes || loanTypes.length === 0}
-                    >
-                      <option value="" disabled>
-                        {loadingLoanTypes
-                          ? "Loading loan types…"
-                          : loanTypes.length === 0
-                            ? "No loan types available"
-                            : "Select loan type"}
-                      </option>
-                      {loanTypes.map((lt) => (
-                        <option key={lt.loan_type_id} value={String(lt.loan_type_id)}>
-                          {lt.loan_type} — ROI {lt.roi}% · {lt.min_tenure}–{lt.max_tenure} mo.
-                        </option>
-                      ))}
-                    </select>
-                    {selectedApplyLoanTypeMeta ? (
-                      <div className="form-text">
-                        Reference rate (ROI): {selectedApplyLoanTypeMeta.roi}% p.a. Allowed tenure:{" "}
-                        {selectedApplyLoanTypeMeta.min_tenure}–{selectedApplyLoanTypeMeta.max_tenure} months.
-                      </div>
-                    ) : null}
-                  </div>
-                  <div className="col-12 col-md-6">
-                    <label className="form-label" htmlFor="loanLinkedAccountId">
-                      Linked account
-                    </label>
-                    <select
-                      id="loanLinkedAccountId"
-                      name="linked_account_id"
-                      className="form-select"
-                      defaultValue=""
-                      disabled={isSubmittingLoan || accounts.length === 0}
-                    >
-                      <option value="">None</option>
-                      {accounts.map((acc) => (
-                        <option key={acc.account_id} value={acc.account_id}>
-                          {acc.account_number} · {formatEnumLabel(acc.account_type)}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="form-text">Optional savings/current account to link.</div>
-                  </div>
-                  <div className="col-12 col-md-6">
-                    <label className="form-label" htmlFor="loanPrincipalAmount">
-                      Principal amount <span className="text-danger">*</span>
-                    </label>
-                    <input
-                      id="loanPrincipalAmount"
-                      name="principal_amount"
-                      type="number"
-                      inputMode="decimal"
-                      className="form-control"
-                      placeholder="0.00"
-                      min={0.01}
-                      step={0.01}
-                      required
-                      disabled={isSubmittingLoan}
-                    />
-                  </div>
-                  <div className="col-12 col-md-6">
-                    <label className="form-label" htmlFor="loanDisbursedAmount">
-                      Disbursed amount
-                    </label>
-                    <input
-                      id="loanDisbursedAmount"
-                      type="text"
-                      className="form-control"
-                      value="0.00"
-                      readOnly
-                      disabled
-                      aria-readonly="true"
-                    />
-                    <div className="form-text">Set to zero at application; updated after disbursement.</div>
-                  </div>
-                  <div className="col-12 col-md-6">
-                    <label className="form-label" htmlFor="loanInterestRate">
-                      Interest rate (annual %)
-                    </label>
-                    <input
-                      id="loanInterestRate"
-                      type="text"
-                      className="form-control"
-                      value={selectedApplyLoanTypeMeta ? `${selectedApplyLoanTypeMeta.roi}%` : "Select loan type first"}
-                      readOnly
-                      disabled
-                      aria-readonly="true"
-                    />
-                    <div className="form-text">Rate is auto-selected from loan type and cannot be edited.</div>
-                  </div>
-                  <div className="col-12 col-md-6">
-                    <label className="form-label" htmlFor="loanTenureMonths">
-                      Tenure (months) <span className="text-danger">*</span>
-                    </label>
-                    <input
-                      id="loanTenureMonths"
-                      name="tenure_months"
-                      type="number"
-                      inputMode="numeric"
-                      className="form-control"
-                      placeholder={
-                        selectedApplyLoanTypeMeta
-                          ? `${selectedApplyLoanTypeMeta.min_tenure}–${selectedApplyLoanTypeMeta.max_tenure}`
-                          : "Select loan type first"
-                      }
-                      value={applyLoanTenureStr}
-                      onChange={(e) => setApplyLoanTenureStr(e.target.value)}
-                      min={selectedApplyLoanTypeMeta?.min_tenure ?? 1}
-                      max={selectedApplyLoanTypeMeta?.max_tenure ?? 600}
-                      step={1}
-                      required
-                      disabled={isSubmittingLoan || !applyLoanSelectedTypeId}
-                    />
-                  </div>
-                  <div className="col-12 col-md-6">
-                    <label className="form-label" htmlFor="loanStartDate">
-                      Start date
-                    </label>
-                    <input
-                      id="loanStartDate"
-                      name="start_date"
-                      type="date"
-                      className="form-control"
-                      value={applyLoanStartDate}
-                      onChange={(e) => setApplyLoanStartDate(e.target.value)}
-                      disabled={isSubmittingLoan}
-                    />
-                  </div>
-                  <div className="col-12 col-md-6">
-                    <label className="form-label" htmlFor="loanEndDate">
-                      End date
-                    </label>
-                    <input
-                      id="loanEndDate"
-                      type="date"
-                      className="form-control bg-body-secondary"
-                      value={applyLoanComputedEndDate}
-                      readOnly
-                      tabIndex={-1}
-                      aria-readonly="true"
-                      autoComplete="off"
-                    />
-                    <div className="form-text">
-                      {applyLoanComputedEndDate
-                        ? `Auto-calculated from start date + tenure (${formatDate(applyLoanComputedEndDate)}).`
-                        : "Set start date and tenure to calculate end date."}
-                    </div>
-                  </div>
-                  <div className="col-12 col-md-6">
-                    <p className="form-label mb-1">Loan status</p>
-                    <p className="form-control-plaintext mb-0 fw-semibold" id="loanStatusReadonly">
-                      APPLIED
-                    </p>
-                    <div className="form-text">New applications are recorded as APPLIED.</div>
-                  </div>
-                </div>
-                {applyLoanSubmitMessage ? (
-                  <div className="alert alert-danger mt-3 mb-0 py-2" role="alert">
-                    {applyLoanSubmitMessage}
-                  </div>
-                ) : null}
-              </div>
-              <div className="modal-footer">
-                <button
-                  type="button"
-                  className="btn btn-outline-secondary"
-                  onClick={closeApplyLoanModal}
-                  disabled={isSubmittingLoan}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={isSubmittingLoan || loadingLoanTypes || loanTypes.length === 0}
-                >
-                  {isSubmittingLoan ? "Submitting…" : "Submit application"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </div>
-      {applyLoanModalOpen ? (
-        <div
-          className="modal-backdrop fade show"
-          role="presentation"
-          onClick={() => {
-            if (!isSubmittingLoan) {
-              closeApplyLoanModal();
-            }
-          }}
-        />
-      ) : null}
-
-    <div
-        className={`modal fade${documentViewModalOpen ? " show d-block" : ""}`}
-        id="makePaymentModal"
-        tabIndex={-1}
-        role="dialog"
-        aria-modal={documentViewModalOpen}
-        aria-labelledby="submittedDocumentsViewModalLabel"
-        style={documentViewModalOpen ? undefined : { display: "none" }}
-      >
-        <div className="modal-dialog modal-dialog-scrollable">
-          <div className="modal-content">
-            <div className="modal-header">
-              <h2 className="modal-title h5" id="submittedDocumentsViewModalLabel ">
-                View Submitted Documents for Loan
-              </h2>
-              <button
-                type="button"
-                className="btn-close"
-                aria-label="Close"
-                onClick={closeDocumentViewModalOpen}
-                disabled={isSubmittingDocument}
-              />
-            </div>
-            <div className="modal-body" style={{ maxHeight: "70vh", overflowY: "auto" }}>
-                <div className="row g-3">
-                  <div className="col-12">
-            {isLoading ? (
-              <p className="text-muted mb-0">Loading accounts…</p>
-            ) : documentList.length === 0 ? (
-              <p className="text-muted mb-0">No documents found.</p>
-            ) : (
-              <div className="table-responsive">
-                <table className="table table-striped mb-0">
-                  <thead>
-                    <tr>
-                      <th>Document ID</th>
-                      <th>Type</th>
-                      <th>File</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {documentList.map((document) => (
-                      <tr key={document.document_id}>
-                        <td>{document.document_id}</td>
-                        <td>{document.document_type}</td>
-                        <td>{document.document_file}</td>
-                        <td>{document.status}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div
-        className={`modal fade${statementViewModalOpen ? " show d-block" : ""}`}
-        id="makePaymentModal"
-        tabIndex={-1}
-        role="dialog"
-        aria-modal={statementViewModalOpen}
-        aria-labelledby="submittedDocumentsViewModalLabel"
-        style={statementViewModalOpen ? undefined : { display: "none" }}
-      >
-        <div className="modal-dialog modal-dialog-scrollable">
-          <div className="modal-content">
-            <div className="modal-header">
-              <h2 className="modal-title h5" id="submittedDocumentsViewModalLabel ">
-                Account Statements
-              </h2>
-              <button
-                type="button"
-                className="btn-close"
-                aria-label="Close"
-                onClick={closeStatementViewModalOpen}
-              />
-            </div>
-            <div className="modal-body" style={{ maxHeight: "70vh", overflowY: "auto" }}>
-                <div className="row g-3">
-                  <div className="col-12">
-            {isLoading ? (
-              <p className="text-muted mb-0">Loading accounts…</p>
-            ) : statementList.length === 0 ? (
-              <p className="text-muted mb-0">No statements found.</p>
-            ) : (
-              <div className="table-responsive">
-                <table className="table table-striped mb-0">
-                  <thead>
-                    <tr>
-                      <th>Transction ID</th>
-                      <th>Amount</th>
-                      <th>Type</th>
-                      <th>Beneficiary Name</th>
-                      <th>Status</th>
-                      <th>Date</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {statementList.map((statement) => (
-                      <tr key={statement.transaction_id}>
-                        <td>{statement.transaction_id}</td>
-                        <td>{statement.amount}</td>
-                        <td>{statement.transaction_type}</td>
-                        <td>{statement.beneficiary_name}</td>
-                        <td>{statement.status}</td>
-                        <td>{statement.created_at}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div
-        className={`modal fade${submitDocumentModalOpen ? " show d-block" : ""}`}
-        id="makePaymentModal"
-        tabIndex={-1}
-        role="dialog"
-        aria-modal={submitDocumentModalOpen}
-        aria-labelledby="makePaymentModalLabel"
-        style={submitDocumentModalOpen ? undefined : { display: "none" }}
-      >
-        <div className="modal-dialog modal-dialog-scrollable">
-          <div className="modal-content">
-            <div className="modal-header">
-              <h2 className="modal-title h5" id="makePaymentModalLabel">
-                Submit Document for Loan
-              </h2>
-              <button
-                type="button"
-                className="btn-close"
-                aria-label="Close"
-                onClick={closeSubmitDocumentModalOpen}
-                disabled={isSubmittingDocument}
-              />
-            </div>
-            <form onSubmit={handleSubmitDocumentAction}>
-              <div className="modal-body" style={{ maxHeight: "70vh", overflowY: "auto" }}>
-                <div className="row g-3">
-                  <div className="col-12">
-                    <label className="form-label" htmlFor="paymentFromAccount">
-                      Select Document Type<span className="text-danger">*</span>
-                    </label>
-                    <select
-                      id="document_type"
-                      name="document_type"
-                      className="form-select"
-                      required
-                    >
-                      <option value="adhhar">Adhar</option>
-                      <option value="pan">Pan</option>
-                      <option value="rent_agrreement">Rent Aggrement</option>
-                      <option value="photo">Photo</option>
-                      <option value="salary_slip">Salary Slip</option>
-                    </select>
-                  </div>
-
-                  <div className="col-12">
-                    <label className="form-label" htmlFor="paymentBeneficiary">
-                      Upload Document <span className="text-danger">*</span>
-                    </label>
-                    <input type="file" name="document_file" id="document_file"/>
-                    <div className="form-text">Upload file with size less than 1mb</div>
-                  </div>
-                </div>
-              </div>
-              <div className="modal-footer">
-                <button
-                  type="button"
-                  className="btn btn-outline-secondary"
-                  onClick={closeSubmitDocumentModalOpen}
-                  disabled={isSubmittingDocument}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={
-                    isSubmittingDocument
-                  }
-                >
-                  {isSubmittingDocument ? "Processing…" : "Upload Document"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </div>
-      {submitDocumentModalOpen ? (
-        <div
-          className="modal-backdrop fade show"
-          role="presentation"
-          onClick={() => {
-            if (!isSubmittingDocument) {
-              closeSubmitDocumentModalOpen();
-            }
-          }}
-        />
-      ) : null}
-
+      <SubmitDocumentModal
+        open={submitDocumentModalOpen}
+        isSubmitting={isSubmittingDocument}
+        message={submitDocumentMessage}
+        onClose={closeSubmitDocumentModalOpen}
+        onSubmit={handleSubmitDocumentAction}
+      />
     </main>
   );
 }
