@@ -449,7 +449,7 @@ export default function DashboardPage() {
       beneficiary_id: beneficiaryId,
       amount,
       currency_code: "INR",
-      transaction_type: "PAYMENT",
+      transaction_type: "Credit",
       status: "COMPLETED",
       payment_channel: String(formData.get("payment_channel") || "NETBANKING"),
     };

@@ -16,7 +16,13 @@ const createTransaction = async (payload) => {
   if (!Number.isFinite(amount) || amount <= 0) {
     throw new AppError("Invalid payment amount", 400);
   }
-
+  
+  const transaction_type = payload.transaction_type;
+  if (transaction_type.toLowerCase() !== "credit"
+       && transaction_type.toLowerCase() !== "debit") {
+    throw new AppError("Invalid transaction type", 400);
+  }
+  
   const account = await findAccountWithCustomer(payload.from_account_id);
   if (!account) {
     throw new AppError("Debit account not found", 404);
@@ -61,7 +67,7 @@ const createTransaction = async (payload) => {
         beneficiary_id: payload.beneficiary_id,
         amount,
         currency_code: payload.currency_code ?? "INR",
-        transaction_type: payload.transaction_type ?? "PAYMENT",
+        transaction_type: payload.transaction_type ?? "Credit",
         status: payload.status ?? "COMPLETED",
         payment_channel: payload.payment_channel ?? "NETBANKING",
         remarks: payload.remarks,

@@ -17,7 +17,7 @@ const createTransactionSchema = z
         message: "Amount must have at most 2 decimal places",
       }),
     currency_code: z.enum(["INR"]).default("INR"),
-    transaction_type: z.enum(["PAYMENT", "TRANSFER"]).optional(),
+    transaction_type: z.enum(["Credit", "Debit"]).optional(),
     status: z.enum(["PENDING", "COMPLETED", "FAILED"]).optional(),
     payment_channel: z.enum(["NETBANKING", "MOBILE", "BRANCH"]).optional(),
     remarks: z.preprocess(
