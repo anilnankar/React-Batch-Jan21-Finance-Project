@@ -1,0 +1,322 @@
+{
+  "info": {
+    "name": "Finance Project API",
+    "_postman_id": "9a95f411-b1b1-4b2e-8f3e-8a5a29d00101",
+    "description": "Postman collection for Finance Project backend APIs.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"john@example.com\",\n  \"password\": \"Pass@123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "login"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Customers",
+      "item": [
+        {
+          "name": "Create Customer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer_type\": \"INDIVIDUAL\",\n  \"account_type\": \"SAVINGS\",\n  \"full_name\": \"John Doe\",\n  \"date_of_birth_or_incorp\": \"1994-02-14\",\n  \"mobile_number\": \"9876543210\",\n  \"email\": \"john@example.com\",\n  \"password\": \"Pass@123\",\n  \"pan_number\": \"ABCDE1234F\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/customers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Customer By Id",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/customers/{{customerId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "{{customerId}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Accounts",
+      "item": [
+        {
+          "name": "Get Accounts By Customer Id",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/accounts/customer/{{customerId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts",
+                "customer",
+                "{{customerId}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Beneficiaries",
+      "item": [
+        {
+          "name": "Create Beneficiary",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"account_id\": 1,\n  \"beneficiary_name\": \"Jane Doe\",\n  \"beneficiary_account_number\": \"ACC1727765432100\",\n  \"ifsc_code\": \"HDFC0ABC123\",\n  \"bank_name\": \"HDFC Bank\",\n  \"nickname\": \"Jane\",\n  \"status\": \"ACTIVE\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/beneficiaries",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "beneficiaries"
+              ]
+            }
+          }
+        },
+        {
+          "name": "List Beneficiaries By Account Id",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/beneficiaries/account/{{accountId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "beneficiaries",
+                "account",
+                "{{accountId}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Transactions",
+      "item": [
+        {
+          "name": "Create Transaction",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer_id\": 1,\n  \"from_account_id\": 10,\n  \"beneficiary_id\": 5,\n  \"amount\": 1000.5,\n  \"currency_code\": \"INR\",\n  \"transaction_type\": \"Debit\",\n  \"status\": \"COMPLETED\",\n  \"payment_channel\": \"NETBANKING\",\n  \"remarks\": \"Rent transfer\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/transactions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "transactions"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Transactions By Customer Id",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/transactions/{{customerId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "transactions",
+                "{{customerId}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Loans",
+      "item": [
+        {
+          "name": "List Loan Types",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/loan-types",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "loan-types"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Loan",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"loan_type_id\": 1,\n  \"customer_id\": 1,\n  \"linked_account_id\": 10,\n  \"principal_amount\": 250000,\n  \"tenure_months\": 36,\n  \"start_date\": \"2026-01-01\",\n  \"end_date\": \"2028-12-31\",\n  \"loan_status\": \"APPLIED\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/loans",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "loans"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Loans By Customer Id",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/loans/customer/{{customerId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "loans",
+                "customer",
+                "{{customerId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Loan Document",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"loan_id\": 1,\n  \"document_type\": \"PAN\",\n  \"document_file\": \"https://example.com/docs/pan.pdf\",\n  \"status\": \"Pending\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/loan-documents",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "loan-documents"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Loan Documents By Loan Id",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/loan-documents/{{loanId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "loan-documents",
+                "{{loanId}}"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000/api/v1"
+    },
+    {
+      "key": "customerId",
+      "value": "1"
+    },
+    {
+      "key": "accountId",
+      "value": "1"
+    },
+    {
+      "key": "loanId",
+      "value": "1"
+    }
+  ]
+}
